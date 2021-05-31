@@ -1,0 +1,188 @@
+<?php
+namespace App\Services;
+
+use App\Jobs\ParseTicketPdf;
+use App\Models\Gmail;
+use App\Models\GmailFilter;
+use App\Models\User;
+use Dacastro4\LaravelGmail\Facade\LaravelGmail;
+use Dacastro4\LaravelGmail\Services\Message;
+use Dompdf\Dompdf;
+use Dompdf\Options;
+use Illuminate\Support\Facades\Storage;
+
+class GmailService
+{
+    const MAX_PAGES_TO_LOAD = 1000;
+
+    public static function getRecentMails()
+    {
+        return LaravelGmail::message()->take(1)->preload()->all();
+    }
+
+    public static function authCheck(User $user)
+    {
+        return LaravelGmail::setUserId($user->id)->check();
+    }
+
+    public static function saveData(Message\Mail $mail, GmailFilter $filter)
+    {
+        if ($filter->regex && (! static::checkRegex($mail->getSubject(), $filter->regex) && ! static::checkRegex($mail->getHtmlBody(), $filter->regex))) {
+            return;
+        }
+
+        $gmail = $filter->gmails()->firstOrNew([
+            'gmail_filter_id' => $filter->id,
+            'mail_id' => $mail->getId(),
+        ]);
+        if (! $gmail->id) {
+            $gmail->fill([
+                'user_id' => $filter->user_id,
+                'internal_date' => $mail->getInternalDate(),
+                'date' => $mail->getDate(),
+                'labels' => $mail->getLabels(),
+                'subject' => $mail->getSubject(),
+                'from_name' => $mail->getFromName(),
+                'from_email' => $mail->getFromEmail(),
+                'to' => $mail->getTo(),
+                'delivered_to' => $mail->getDeliveredTo(),
+                'html_body' => $mail->getHtmlBody(),
+                'attachments' => $mail->hasAttachments() ? static::downloadAttachments($mail, $filter->user_id): null // todo: check why auth fails
+            ]);
+            $gmail->save();
+
+            // save html pdf body
+            static::saveBodyToPdfFile($gmail);
+
+            // parse pdf file if any. @todo put to event?
+            if ($gmail->attachments) {
+                foreach ($gmail->attachments as $attachment) {
+                    if ($attachment['file_name'] == 'ticket.pdf') { //@todo store value in GmailFilter?
+                        ParseTicketPdf::dispatch($gmail, $attachment);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * @param Message\Mail $mail
+     * @param $userId
+     * @return array
+     */
+    public static function downloadAttachments(Message\Mail $mail, $userId)
+    {
+        $localId = 0;
+        foreach ($attachments = $mail->getAttachments() as $attachment) {
+
+            $localId++;
+            $attachmentPath = static::makeAttachmentPath($mail->getId(), $localId, $userId);
+            $fileName = $attachment->getFileName();
+
+             $attachment->saveAttachmentTo($attachmentPath, $fileName);
+
+            $result[] = [
+                'id' => $localId,
+                'file_name' => $fileName,
+                'size' => $attachment->getSize(),
+                'file_path' => $attachmentPath.'/'.$fileName,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param Gmail $gmail
+     * @return string
+     */
+    public static function saveBodyToPdfFile(Gmail $gmail)
+    {
+        $options = new Options();
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('isRemoteEnabled', true);
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($gmail->html_body);
+        $dompdf->setPaper('A4');
+        $dompdf->render();
+
+        $filePath = static::makePdfBodyPath($gmail->mail_id, $gmail->user_id).'/'.$gmail->mail_id.'.pdf';
+        Storage::disk('local')->put($filePath, $dompdf->output());
+
+        $gmail->update(['pdf_body_path' => $filePath]);
+
+        return $filePath;
+    }
+
+    /**
+     * @param $mailId
+     * @param $localId
+     * @param $userId
+     * @return string
+     */
+    public static function makeAttachmentPath($mailId, $localId, $userId)
+    {
+        return 'gmail/'.date('Y/m/d').'/u'.$userId.'/m_'.$mailId.'/attachments/'.$localId;
+    }
+
+    /**
+     * @param $mailId
+     * @param $userId
+     * @return string
+     */
+    public static function makePdfBodyPath($mailId, $userId)
+    {
+        return 'gmail/'.date('Y/m/d').'/u'.$userId.'/m_'.$mailId;
+    }
+
+
+    public static function getMailByFilter(GmailFilter $filter, $beforeDate = null, $afterDate = null)
+    {
+        try {
+            $query = LaravelGmail::setUserId($filter->user_id)
+                ->message();
+
+            if ($filter) {
+                $query->raw($filter->filter);
+            }
+
+            if ($beforeDate) {
+                $query->before($beforeDate);
+            }
+
+            if ($afterDate) {
+                $query->after($afterDate);
+            }
+
+            $messages = $query->take(100)
+                ->preload()
+                ->all();
+
+
+            foreach ($messages as $mail) {
+                static::saveData($mail, $filter);
+            }
+
+            $page = 0;
+            while ($messages->hasNextPage()) {
+                if ($page++ >= static::MAX_PAGES_TO_LOAD) {
+                   return;
+                }
+
+                foreach ($messages->next() as $mail) {
+                    static::saveData($mail, $filter);
+                }
+            }
+        } catch (\Exception $e) { // @todo use google exception
+            \Log::info(print_r($e->getMessage(), true));
+            return []; // handle different errors
+        }
+    }
+
+    private static function checkRegex($str, $regex)
+    {
+        return preg_match($regex, $str, $result);
+    }
+
+
+}
