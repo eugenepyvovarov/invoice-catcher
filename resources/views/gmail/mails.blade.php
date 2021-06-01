@@ -55,8 +55,8 @@
                                     <td title="{{ $gmail->from_email }}">{{ $gmail->from_name }}</td>
                                     <td><a href="{{ route('gmail.mailBody', $gmail->id) }}" target="_blank">{{ \Illuminate\Support\Str::limit($gmail->subject, 80)}}</a></td>
                                     <td>
-                                        @if ($gmail->pdf_body_path)
-                                            <a href="{{ route('gmail.downloadPdf', $gmail->id) }}"><i class="far fa-file-pdf"></i></a>
+                                    @if ($gmail->pdf_body_path)
+                                            <a  class="btn btn-sm btn-outline-primary" title="pdf body" href="{{ route('gmail.downloadPdf', $gmail->id) }}"><i class="far fa-file-pdf"></i></a>
                                         @endif
                                     </td>
                                     <td>
