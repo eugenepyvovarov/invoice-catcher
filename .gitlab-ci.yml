@@ -1,0 +1,24 @@
+image: python:3.8-alpine
+
+stages:
+  - Deploy
+
+sandbox:
+  stage: Deploy
+  image: alpine:latest
+  before_script:
+      - apk update
+      - apk add openssh
+      - eval $(ssh-agent -s)
+      - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+      - mkdir -p ~/.ssh
+      - chmod 700 ~/.ssh
+      - ssh-keyscan $SSH_SERVER >> ~/.ssh/known_hosts
+      - chmod 644 ~/.ssh/known_hosts
+  script:
+      - |
+        ssh root@$SSH_SERVER << EOF
+          cd /var/www/vhosts/maketry.xyz/catcher.maketry.xyz
+          git pull
+          chown -R lifelabs /var/www/vhosts/maketry.xyz/catcher.maketry.xyz
+        EOF
