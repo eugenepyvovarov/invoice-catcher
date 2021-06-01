@@ -130,13 +130,14 @@ class GmailController extends Controller
             $zip = new \ZipStream\ZipStream($zipFileName, $options);
 
             $gmails = auth()->user()->gmails()->whereIn('id', $request->get('gmailIds'))->orderBy('id')->get();
-
             foreach ($gmails as $gmail) {
                 if ($gmail->pdf_body_path) {
                     $zip->addFileFromPath('mail_'.$gmail->id.'/letter.pdf', $gmail->getPdfBodyFullPath());
                 }
-                foreach ($gmail->attachments as $attachment) {
-                    $zip->addFileFromPath('mail_'.$gmail->id.'/'.$attachment['id'].'_'.$attachment['file_name'], storage_path('app/'.$attachment['file_path']));
+                if ($gmail->attachments) {
+                    foreach ($gmail->attachments as $attachment) {
+                        $zip->addFileFromPath('mail_'.$gmail->id.'/'.$attachment['id'].'_'.$attachment['file_name'], storage_path('app/'.$attachment['file_path']));
+                    }
                 }
             }
             $zip->finish();
