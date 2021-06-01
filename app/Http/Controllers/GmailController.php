@@ -132,7 +132,9 @@ class GmailController extends Controller
             $gmails = auth()->user()->gmails()->whereIn('id', $request->get('gmailIds'))->orderBy('id')->get();
 
             foreach ($gmails as $gmail) {
-                $zip->addFileFromPath('mail_'.$gmail->id.'/letter.pdf', $gmail->getPdfBodyFullPath());
+                if ($gmail->pdf_body_path) {
+                    $zip->addFileFromPath('mail_'.$gmail->id.'/letter.pdf', $gmail->getPdfBodyFullPath());
+                }
                 foreach ($gmail->attachments as $attachment) {
                     $zip->addFileFromPath('mail_'.$gmail->id.'/'.$attachment['id'].'_'.$attachment['file_name'], storage_path('app/'.$attachment['file_path']));
                 }

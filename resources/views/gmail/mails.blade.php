@@ -82,8 +82,10 @@
                         <div class="row">
                             <div class="col-md-2">
                                 <span style="padding-left: 10px">
-                                <i style="cursor: pointer; display: none" title="Download Achive" id="dowload_button" class="fa fa-download" aria-hidden="true"></i>
-                                    <input type="hidden" name="action" value="dowloadZip">
+                                  <div class="btn btn-primary" id="dowload_button"  style="cursor: pointer; display: none">
+                                          <i title="Download Achive" class="fa fa-download" aria-hidden="true"></i>
+                                 </div>
+                                <input type="hidden" name="action" value="dowloadZip">
                                 </span>
                                 {{--<select id="checkbox_action" class="form-control">--}}
                                     {{--<option></option>--}}

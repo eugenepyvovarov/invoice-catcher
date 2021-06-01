@@ -48,7 +48,7 @@ class Gmail extends Model
 
     public function getPdfBodyFullPath()
     {
-        return storage_path('app/'.$this->pdf_body_path);
+        return  $this->pdf_body_path ? storage_path('app/'.$this->pdf_body_path) : null;
     }
 
 }
