@@ -26,6 +26,7 @@ class CreateGmailsTable extends Migration
             $table->string('delivered_to')->nullable();
             $table->string('subject')->nullable();
             $table->longText('html_body')->nullable();
+            $table->string('pdf_body_path')->nullable();
             $table->json('attachments')->nullable();
             $table->dateTime('date')->nullable();
             $table->timestamps();

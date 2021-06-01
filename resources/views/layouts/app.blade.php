@@ -38,7 +38,6 @@
                         @if(\App\Services\GmailService::authCheck(auth()->user()))
                         <li><a class="nav-link" href="{{ route('gmailFilter.index') }}">{{ __('Gmail Filters') }}</a></li>
                         <li><a class="nav-link" href="{{ route('gmail.mails') }}">{{ __('Gmail Mails') }}</a></li>
-                        <li><a class="nav-link" href="{{ route('ticket.index') }}">{{ __('Tickets') }}</a></li>
                         @endif
                         @endauth
                     </ul>

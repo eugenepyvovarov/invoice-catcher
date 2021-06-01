@@ -54,7 +54,11 @@
                                     <td>{{ $gmail->id }}</td>
                                     <td title="{{ $gmail->from_email }}">{{ $gmail->from_name }}</td>
                                     <td><a href="{{ route('gmail.mailBody', $gmail->id) }}" target="_blank">{{ \Illuminate\Support\Str::limit($gmail->subject, 80)}}</a></td>
-                                    <td><a href="{{ route('gmail.downloadPdf', $gmail->id) }}"><i class="far fa-file-pdf"></i></a></td>
+                                    <td>
+                                        @if ($gmail->pdf_body_path)
+                                            <a href="{{ route('gmail.downloadPdf', $gmail->id) }}"><i class="far fa-file-pdf"></i></a>
+                                        @endif
+                                    </td>
                                     <td>
                                         @if($gmail->attachments)
                                             @foreach($gmail->attachments as $attachment)

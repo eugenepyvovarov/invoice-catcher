@@ -19,7 +19,6 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
-        'phone',
         'password',
     ];
 
@@ -65,13 +64,4 @@ class User extends Authenticatable
     {
         return $this->hasMany(Gmail::class);
     }
-
-    /**
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
-     */
-    public function tickets()
-    {
-        return $this->hasMany(Ticket::class);
-    }
-
 }

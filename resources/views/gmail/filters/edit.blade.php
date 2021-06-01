@@ -46,7 +46,9 @@
                             <div class="form-group row">
                                 <label for="regex" class="col-md-10 col-form-label">{{ __('Regex') }}</label>
                                 <div class="col-md-10">
-                                    <input id="regex" type="text" class="form-control @error('regex') is-invalid @enderror" name="regex" value="{{ old('regex', $filter->regex) }}"  autocomplete="regex">
+                                    <input id="regex" type="text" class="form-control @error('regex') is-invalid @enderror"
+                                    placeholder="/[A-Z]+/"
+                                    name="regex" value="{{ old('regex', $filter->regex) }}"  autocomplete="regex">
                                     @error('name')
                                     <span class="invalid-feedback" role="alert">
                                         <strong>{{ $message }}</strong>

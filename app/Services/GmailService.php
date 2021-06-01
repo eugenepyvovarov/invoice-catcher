@@ -1,7 +1,6 @@
 <?php
 namespace App\Services;
 
-use App\Jobs\ParseTicketPdf;
 use App\Models\Gmail;
 use App\Models\GmailFilter;
 use App\Models\User;
@@ -51,16 +50,9 @@ class GmailService
             ]);
             $gmail->save();
 
-            // save html pdf body
-            static::saveBodyToPdfFile($gmail);
-
-            // parse pdf file if any. @todo put to event?
-            if ($gmail->attachments) {
-                foreach ($gmail->attachments as $attachment) {
-                    if ($attachment['file_name'] == 'ticket.pdf') { //@todo store value in GmailFilter?
-                        ParseTicketPdf::dispatch($gmail, $attachment);
-                    }
-                }
+            if (! $gmail->attachments) {
+                // save html pdf body
+                static::saveBodyToPdfFile($gmail);
             }
         }
     }
@@ -75,9 +67,14 @@ class GmailService
         $localId = 0;
         foreach ($attachments = $mail->getAttachments() as $attachment) {
 
+            $fileName = $attachment->getFileName();
+
+            // filter by extension
+            if (! in_array(pathinfo($fileName, PATHINFO_EXTENSION), ['pdf'])) continue;
+
             $localId++;
             $attachmentPath = static::makeAttachmentPath($mail->getId(), $localId, $userId);
-            $fileName = $attachment->getFileName();
+
 
              $attachment->saveAttachmentTo($attachmentPath, $fileName);
 
@@ -102,8 +99,11 @@ class GmailService
         $options->set('isHtml5ParserEnabled', true);
         $options->set('isRemoteEnabled', true);
         $dompdf = new Dompdf($options);
-        $dompdf->loadHtml($gmail->html_body);
-        $dompdf->setPaper('A4');
+
+        $htmlBody = str_replace(['cellpadding="0"', 'cellspacing="0"'], ['cellpadding="1"', 'cellspacing="1"'], $gmail->html_body); // pdf devizion by zero issue fix
+
+        $dompdf->loadHtml($htmlBody);
+        $dompdf->setPaper('A4', 'landscape');
         $dompdf->render();
 
         $filePath = static::makePdfBodyPath($gmail->mail_id, $gmail->user_id).'/'.$gmail->mail_id.'.pdf';

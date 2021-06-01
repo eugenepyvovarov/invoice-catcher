@@ -29,19 +29,7 @@ Route::group(['middleware' => ['auth']], function () {
 
     Route::get('/test', [\App\Http\Controllers\HomeController::class, 'test'])->name('test');
 
-    // Tickets
-    Route::get('/tickets', [\App\Http\Controllers\TicketController::class, 'index'])->name('ticket.index');
-    Route::get('/tickets/create', [\App\Http\Controllers\TicketController::class, 'create'])->name('ticket.create');
-    Route::get('/tickets/{id}/edit', [\App\Http\Controllers\TicketController::class, 'edit'])->name('ticket.edit');
-    Route::post('/tickets/{id}/update', [\App\Http\Controllers\TicketController::class, 'update'])->name('ticket.update');
-    Route::post('/tickets/{id}/delete', [\App\Http\Controllers\TicketController::class, 'destroy'])->name('ticket.delete');
-    Route::post('/tickets/store', [\App\Http\Controllers\TicketController::class, 'store'])->name('ticket.store');
-    Route::get('/tickets/{id}/check-trafikverket/', [\App\Http\Controllers\TicketController::class, 'checkTrafikverket'])->name('ticket.checkTrafikverket');
-
-    // Station
-    Route::get('/ajax/stations', [\App\Http\Controllers\StationController::class, 'ajaxStations'])->name('sstation.ajaxStations');
-
-    // Gamil Profile
+      // Gamil Profile
     Route::get('/gmail/profile', [\App\Http\Controllers\GmailController::class, 'profile'])->name('gmail.profile');
     Route::post('/gmail/profile/clear', [\App\Http\Controllers\GmailController::class, 'clearProfile'])->name('gmail.profile.clear');
 

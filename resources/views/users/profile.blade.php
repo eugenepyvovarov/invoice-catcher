@@ -11,7 +11,6 @@
                     <div class="card-body">
                         <div>Name: {{ $authUser->name }}</div>
                         <div>Email: {{ $authUser->email }}</div>
-                        <div>Phone: {{ $authUser->phone }}</div>
                     </div>
                 </div>
                 <br>
@@ -36,12 +35,6 @@
                                 <input class="form-check-input" name="models[]" type="checkbox" value="{{ \App\Models\GmailProfile::class }}" id="profile" />
                                 <label class="form-check-label" for="profile">
                                     Gmail Profile
-                                </label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" name="models[]" type="checkbox" value="{{ \App\Models\Ticket::class }}" id="ticket" />
-                                <label class="form-check-label" for="ticket">
-                                    Tickets
                                 </label>
                             </div>
                             @error('models')

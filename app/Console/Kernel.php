@@ -16,7 +16,6 @@ class Kernel extends ConsoleKernel
      */
     protected $commands = [
         GmailCheckCron::class,
-        LoadStations::class,
     ];
 
     /**

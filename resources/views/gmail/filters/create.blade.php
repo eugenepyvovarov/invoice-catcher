@@ -52,7 +52,7 @@
                                            class="form-control @error('regex') is-invalid @enderror"
                                            name="regex"
                                            value="{{ old('regex') }}"
-                                           autocomplete="regex">
+                                           placeholder="/[A-Z]+/">
                                     @error('regex')
                                     <span class="invalid-feedback" role="alert">
                                         <strong>{{ $message }}</strong>

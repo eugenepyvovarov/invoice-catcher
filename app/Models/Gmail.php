@@ -51,11 +51,4 @@ class Gmail extends Model
         return storage_path('app/'.$this->pdf_body_path);
     }
 
-    /**
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
-     */
-    public function tickets()
-    {
-        return $this->hasMany(Ticket::class);
-    }
 }

@@ -5,7 +5,6 @@ namespace App\Http\Requests;
 use App\Models\Gmail;
 use App\Models\GmailFilter;
 use App\Models\GmailProfile;
-use App\Models\Ticket;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -34,7 +33,6 @@ class ClearUserDataRequest extends FormRequest
                     GmailProfile::class,
                     Gmail::class,
                     GmailFilter::class,
-                    Ticket::class
             ])]
         ];
     }
