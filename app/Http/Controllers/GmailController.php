@@ -28,6 +28,20 @@ class GmailController extends Controller
     }
 
     /**
+     * Remove the specified resource from storage.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function destroy($id)
+    {
+        $gmail = auth()->user()->gmails()->findOrFail($id);
+        $gmail->delete();
+        flash()->success('Mail #'.$gmail->id.' was successfully deleted');
+        return redirect()->route('gmail.mails');
+    }
+
+    /**
      * @return \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
      */
     public function load(Request $request)

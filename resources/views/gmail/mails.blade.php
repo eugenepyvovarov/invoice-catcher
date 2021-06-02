@@ -31,8 +31,9 @@
                         <div class="clearfix"></div>
                         <br>
                         Rows: {{ $gmails->total() }}
-                        <form action="{{ route('gmail.checkboxAction') }}" method="POST" id="gmail_checkbox_form">
+                        <form name="checkboxForm" action="{{ route('gmail.checkboxAction') }}" method="POST" id="gmail_checkbox_form">
                             @csrf
+                        </form>
                         <table class="table">
                             <thead>
                             <tr>
@@ -43,14 +44,15 @@
                                 <th>PDF</th>
                                 <th>Attachments</th>
                                 <th>Filters</th>
-                                <th>Date</th>
+                                <th width="120px">Date</th>
+                                <th width="90px">Actions</th>
                             </tr>
                             </thead>
                             <tbody>
 
                             @foreach($gmails as $gmail)
                                 <tr>
-                                    <td><input type="checkbox" class="gmail-checkbox" name="gmailIds[]" value="{{ $gmail->id }}"/></td>
+                                    <td><input type="checkbox" class="gmail-checkbox" name="gmailIds[]" form="gmail_checkbox_form" value="{{ $gmail->id }}"/></td>
                                     <td>{{ $gmail->id }}</td>
                                     <td title="{{ $gmail->from_email }}">{{ $gmail->from_name }}</td>
                                     <td><a href="{{ route('gmail.mailBody', $gmail->id) }}" target="_blank">{{ \Illuminate\Support\Str::limit($gmail->subject, 80)}}</a></td>
@@ -74,6 +76,16 @@
                                         @endif
                                     </td>
                                     <td>{{ $gmail->date->toDateTimeString() }}</td>
+                                    <td>
+                                        <form id="deleteForm{{ $gmail->id }}" method="POST" action="{{ route('gmail.delete', $gmail->id) }}" style="display:inline">
+                                            <button class="btn btn-sm btn-default"
+                                                    onclick="return confirm('Delete mail #{{ $gmail->id }}?')"
+                                                    type="submit"
+                                                    form="deleteForm{{ $gmail->id }}"
+                                                    title="Remove #{{ $gmail->id }}"><i class="fas fa-trash-alt"></i></button>
+                                            @csrf
+                                        </form>
+                                    </td>
                                 </tr>
                             @endforeach
 
@@ -82,10 +94,9 @@
                         <div class="row">
                             <div class="col-md-2">
                                 <span style="padding-left: 10px">
-                                  <div class="btn btn-primary" id="dowload_button"  style="cursor: pointer; display: none">
+                                  <div class="btn btn-primary" id="dowload_button" style="cursor: pointer; display: none">
                                           <i title="Download Achive" class="fa fa-download" aria-hidden="true"></i>
                                  </div>
-                                <input type="hidden" name="action" value="dowloadZip">
                                 </span>
                                 {{--<select id="checkbox_action" class="form-control">--}}
                                     {{--<option></option>--}}
@@ -93,7 +104,7 @@
                                 {{--</select>--}}
                             </div>
                         </div>
-                        </form>
+
                         {{ $gmails->links() }}
                     </div>
                 </div>
@@ -114,11 +125,11 @@
             $('#select-all-checkbox').click(function(event) {
                 if(this.checked) {
                     // Iterate each checkbox
-                    $(':checkbox').each(function() {
+                    $('.gmail-checkbox:checkbox').each(function() {
                         this.checked = true;
                     });
                 } else {
-                    $(':checkbox').each(function() {
+                    $('.gmail-checkbox:checkbox').each(function() {
                         this.checked = false;
                     });
                 }
@@ -130,14 +141,14 @@
             });
 
             $(document).on('click', '#dowload_button', function () {
-                if ($("#gmail_checkbox_form input:checkbox:checked").length > 0) {
+                if ($(".gmail-checkbox:checkbox:checked").length > 0) {
                     $('#gmail_checkbox_form').submit();
                 }
             });
         });
 
         function toggleDownloadBtn() {
-            if ($("#gmail_checkbox_form input:checkbox:checked").length > 0) {
+            if ($(".gmail-checkbox:checkbox:checked").length > 0) {
                 $('#dowload_button').show();
             } else {
                 $('#dowload_button').hide();
