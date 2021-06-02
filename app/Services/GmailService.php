@@ -8,6 +8,7 @@ use Dacastro4\LaravelGmail\Facade\LaravelGmail;
 use Dacastro4\LaravelGmail\Services\Message;
 use Dompdf\Dompdf;
 use Dompdf\Options;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Storage;
 
 class GmailService
@@ -75,8 +76,7 @@ class GmailService
             $localId++;
             $attachmentPath = static::makeAttachmentPath($mail->getId(), $localId, $userId);
 
-
-             $attachment->saveAttachmentTo($attachmentPath, $fileName);
+           $attachment->saveAttachmentTo($attachmentPath, $fileName);
 
             $result[] = [
                 'id' => $localId,
@@ -89,30 +89,34 @@ class GmailService
         return $result;
     }
 
-    /**
-     * @param Gmail $gmail
-     * @return string
-     */
+
     public static function saveBodyToPdfFile(Gmail $gmail)
     {
-        $options = new Options();
-        $options->set('isHtml5ParserEnabled', true);
-        $options->set('isRemoteEnabled', true);
-        $dompdf = new Dompdf($options);
+        $htmlBody =  $gmail->html_body;
+        $htmlBody = str_replace(PHP_EOL, '', $gmail->html_body); // pdf devizion by zero issue fix
+        //$htmlBody = str_replace(['cellpadding="0"', 'cellspacing="0"'], ['cellpadding="1"', 'cellspacing="1"'], $htmlBody); // pdf devizion by zero issue fix
+        $htmlBody = preg_replace('/<div name="messageSignatureSection">(.*?)<blockquote type="cite"/', '<div><blockquote type="cite"', $htmlBody); // pdf devizion by zero issue fix
+        $htmlBody = preg_replace('/<blockquote(.*?)>/', '<blockquote>', $htmlBody);
+        $htmlBody = str_replace('[PHP_EOL]', PHP_EOL, $htmlBody);
 
-        $htmlBody = str_replace(['cellpadding="0"', 'cellspacing="0"'], ['cellpadding="1"', 'cellspacing="1"'], $gmail->html_body); // pdf devizion by zero issue fix
-
-        $dompdf->loadHtml($htmlBody);
-        $dompdf->setPaper('A4', 'landscape');
-        $dompdf->render();
+        $pdf = App::make('snappy.pdf.wrapper')
+            ->loadHTML($htmlBody)
+            ->setPaper('a4')
+            ->setOption('margin-bottom', 0)
+            ->setOption('margin-top', 0)
+            ->setOption('margin-left', 0)
+            ->setOption('margin-right', 0);
 
         $filePath = static::makePdfBodyPath($gmail->mail_id, $gmail->user_id).'/'.$gmail->mail_id.'.pdf';
-        Storage::disk('local')->put($filePath, $dompdf->output());
+
+        Storage::disk('local')->put($filePath, $pdf->output());
 
         $gmail->update(['pdf_body_path' => $filePath]);
 
         return $filePath;
+
     }
+
 
     /**
      * @param $mailId
