@@ -105,7 +105,7 @@
                             </div>
                         </div>
 
-                        {{ $gmails->links() }}
+                        {{ $gmails->appends(request()->input())->links() }}
                     </div>
                 </div>
             </div>
