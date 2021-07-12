@@ -39,7 +39,7 @@ Route::group(['middleware' => ['auth']], function () {
     Route::get('/gmails', [\App\Http\Controllers\GmailController::class, 'mails'])->name('gmail.mails');
     Route::get('/gmail/{id}/pdf', [\App\Http\Controllers\GmailController::class, 'downloadPdf'])->name('gmail.downloadPdf');
     Route::get('/gmail/{id}/body', [\App\Http\Controllers\GmailController::class, 'mailBody'])->name('gmail.mailBody');
-    Route::get('/gmail/load', [\App\Http\Controllers\GmailController::class, 'load'])->name('gmail.load');
+    Route::any('/gmail/load', [\App\Http\Controllers\GmailController::class, 'load'])->name('gmail.load');
     Route::get('/gmail/{mailId}/attachment/{attachmentId}/download', [\App\Http\Controllers\GmailController::class, 'downloadAttachment'])->name('gmail.downloadAttachment');
     Route::post('/gmail/{id}/delete', [\App\Http\Controllers\GmailController::class, 'destroy'])->name('gmail.delete');
     Route::post('/gmails/checkbox-action', [\App\Http\Controllers\GmailController::class, 'checkboxAction'])->name('gmail.checkboxAction');

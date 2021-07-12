@@ -9,24 +9,57 @@
                     <div class="card-header">{{ __('Gmail Mails') }}</div>
                     <div class="card-body">
                         <div class="float-right">
-                            <a href="{{ route('gmail.load', ['filter' => request('filter')]) }}" class="btn btn-primary">
-                                {{ __('Load') }}
-                            </a>
+
                         </div>
-                        <div class="float-left">
+                        <div class="row">
+                        <div class="col-md-8">
+
+                        <form action="{{ route('gmail.load') }}" method="POST">
                             <div class="row">
                                 <div class="col-md-12">
                                     Filter:
-                                    <select id="filterMenu" class="form-control">
-                                        <option value="{{ route('gmail.mails') }}">-</option>
+                                    <select id="filterMenu" name="filterId" class="form-control">
+                                        <option value="">-</option>
                                         @foreach($gmailFilters as $gmailFilter)
-                                            <option value="{{ route('gmail.mails', ['filter' => $gmailFilter->id]) }}"
-                                                    @if(request('filter') == $gmailFilter->id) selected @endif
-                                            >{{ $gmailFilter->name }}</option>
+                                            <option
+                                                    value="{{ $gmailFilter->id }}"
+                                                    @if(request('filterId') == $gmailFilter->id) selected @endif
+                                            > {{ \Illuminate\Support\Str::limit($gmailFilter->name, 100) }}</option>
                                         @endforeach
                                     </select>
+                                   <div style="margin-top: 10px; padding: 5px 0px 5px 15px; background-color: #effaff">
+                                        {{ $filter}}
+                                    </div>
                                 </div>
                             </div>
+                            <div class="form-group row">
+                                <label for="filter" class="col-md-10 col-form-label">
+                                    <a href="https://support.google.com/mail/answer/7190" target="_blank">{{ __('New Filter') }}</a>
+                                    </label>
+                                <div class="col-md-12">
+                                    <textarea
+                                            class="form-control @error('new_filter') is-invalid @enderror"
+                                            name="new_filter"
+                                            placeholder="e.g. filename:ticket.pdf"
+                                    >{{ old('new_filter') }}</textarea>
+
+                                    @error('filter')
+                                    <span class="invalid-feedback" role="alert">
+                                        <strong>{{ $message }}</strong>
+                                    </span>
+                                    @enderror
+                                </div>
+                            </div>
+                            <div class="form-group row">
+                                <div class="col-md-10">
+                                    <button class="btn btn-primary">
+                                        {{ __('Load') }}
+                                    </button>
+                                </div>
+                            </div>
+                                @csrf
+                            </form>
+                        </div>
                         </div>
                         <div class="clearfix"></div>
                         <br>
@@ -118,7 +151,9 @@
             toggleDownloadBtn();
             $(document).on('change', '#filterMenu', function () {
                 if ($(this).val()) {
-                    window.location.replace($(this).val());
+                    window.location.replace('http://catcher.local/gmails?filterId='+$(this).val());
+                } else {
+                    window.location.replace('http://catcher.local/gmails');
                 }
             });
 

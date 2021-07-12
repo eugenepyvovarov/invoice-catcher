@@ -47,10 +47,23 @@ class GmailController extends Controller
     public function load(Request $request)
     {
         if (LaravelGmail::check()) {
-            if ($request->get('filter')) {
-                $filter = auth()->user()->gmailFilters()->findOrFail($request->get('filter'));
+
+            if ($request->get('new_filter')) {
+                $filter = auth()->user()->gmailFilters()->create([
+                    'filter' => $request->get('new_filter'),
+                    'name' => $request->get('new_filter')
+                ]);
+                $filterId = $filter->id;
+
+                CheckGmail::dispatch($filter);
+
+            } elseif ($request->get('filterId')) {
+                $filterId = $request->get('filterId');
+
+                $filter = auth()->user()->gmailFilters()->findOrFail($filterId);
                 CheckGmail::dispatch($filter);
             } else {
+                $filterId = null;
                 auth()->user()->gmailFilters()->chunk(100, function ($filters) {
                     foreach ($filters as $filter) {
                         CheckGmail::dispatch($filter);
@@ -59,7 +72,7 @@ class GmailController extends Controller
             }
         }
 
-        return redirect()->route('gmail.mails', ['filter' => $request->get('filter')]);
+        return redirect()->route('gmail.mails', ['filterId' => $filterId]);
     }
 
     /**
@@ -69,12 +82,15 @@ class GmailController extends Controller
     {
         $authUser = auth()->user();
         $gmailsQuery = $authUser->gmails();
-        if ($request->get('filter')) {
-            $gmailsQuery->where('gmail_filter_id', $request->get('filter'));
+        $filter = '';
+        if ($request->get('filterId')) {
+            $filter = $authUser->gmailFilters()->findOrFail($request->get('filterId'));
+            $filter = $filter->filter;
+            $gmailsQuery->where('gmail_filter_id', $request->get('filterId'));
         }
         $gmails = $gmailsQuery->with(['gmailFilter'])->orderBy('date', 'desc')->paginate(500);
-        $gmailFilters = $authUser->gmailFilters()->get();
-        return view('gmail.mails', compact('gmails', 'gmailFilters'));
+        $gmailFilters = $authUser->gmailFilters()->latest()->get();
+        return view('gmail.mails', compact('gmails', 'gmailFilters', 'filter'));
     }
 
     /**
