@@ -72,7 +72,7 @@ class GmailController extends Controller
         if ($request->get('filter')) {
             $gmailsQuery->where('gmail_filter_id', $request->get('filter'));
         }
-        $gmails = $gmailsQuery->with(['gmailFilter'])->orderBy('date', 'desc')->paginate(50);
+        $gmails = $gmailsQuery->with(['gmailFilter'])->orderBy('date', 'desc')->paginate(500);
         $gmailFilters = $authUser->gmailFilters()->get();
         return view('gmail.mails', compact('gmails', 'gmailFilters'));
     }

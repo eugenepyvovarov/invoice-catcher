@@ -18,8 +18,6 @@ Route::get('/', function () {
     return redirect('dashboard');
 });
 
-Route::get('agreement', [\App\Http\Controllers\Auth\RegisterController::class, 'agreement'])->name('agreement');
-
 
 Route::group(['middleware' => ['auth']], function () {
 
