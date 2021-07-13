@@ -22,10 +22,12 @@ class GmailFilterController extends Controller
             ->withCount('gmails')
             ->latest('id')
             ->get();
+
         $gmailDefaultFilter = auth()->user()->gmailFilters()
             ->where('is_default', true)
             ->withCount('gmails')
             ->first();
+        
         return view('gmail.filters.index', compact('gmailFilters', 'gmailDefaultFilter'));
     }
 

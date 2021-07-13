@@ -28,7 +28,7 @@
                                 </tr>
                                 </thead>
                                 <tbody>
-                                @if(! empty($gmailDefaultFilter))
+                                @if($gmailDefaultFilter))
                                 <tr>
                                     <td>{{ $gmailDefaultFilter->name }}
                                         <span style="background-color: lightblue; padding: 0px 3px 0px 3px">default</span>
@@ -57,7 +57,7 @@
                                         <td>{{ $gmailFilter->filter }}</td>
                                         <td>{{ $gmailFilter->regex }}</td>
                                         <td>
-                                            <a href="{{ route('gmail.mails', ['filterId' => $gmailDefaultFilter->id]) }}">
+                                            <a href="{{ route('gmail.mails', ['filterId' => $gmailFilter->id]) }}">
                                                 {{ $gmailFilter->gmails_count }}
                                             </a>
                                        </td>
