@@ -66,6 +66,7 @@ class GmailService
     public static function downloadAttachments(Message\Mail $mail, $userId)
     {
         $localId = 0;
+        $result = [];
         foreach ($attachments = $mail->getAttachments() as $attachment) {
 
             $fileName = $attachment->getFileName();
@@ -92,28 +93,33 @@ class GmailService
 
     public static function saveBodyToPdfFile(Gmail $gmail)
     {
-        $htmlBody =  $gmail->html_body;
-        $htmlBody = str_replace(PHP_EOL, '', $gmail->html_body); // pdf devizion by zero issue fix
-        //$htmlBody = str_replace(['cellpadding="0"', 'cellspacing="0"'], ['cellpadding="1"', 'cellspacing="1"'], $htmlBody); // pdf devizion by zero issue fix
-        $htmlBody = preg_replace('/<div name="messageSignatureSection">(.*?)<blockquote type="cite"/', '<div><blockquote type="cite"', $htmlBody); // pdf devizion by zero issue fix
-        $htmlBody = preg_replace('/<blockquote(.*?)>/', '<blockquote>', $htmlBody);
-        $htmlBody = str_replace('[PHP_EOL]', PHP_EOL, $htmlBody);
+        try {
+            $htmlBody =  $gmail->html_body;
+            $htmlBody = str_replace(PHP_EOL, '', $gmail->html_body); // pdf devizion by zero issue fix
+            //$htmlBody = str_replace(['cellpadding="0"', 'cellspacing="0"'], ['cellpadding="1"', 'cellspacing="1"'], $htmlBody); // pdf devizion by zero issue fix
+            $htmlBody = preg_replace('/<div name="messageSignatureSection">(.*?)<blockquote type="cite"/', '<div><blockquote type="cite"', $htmlBody); // pdf devizion by zero issue fix
+            $htmlBody = preg_replace('/<blockquote(.*?)>/', '<blockquote>', $htmlBody);
+            $htmlBody = str_replace('[PHP_EOL]', PHP_EOL, $htmlBody);
 
-        $pdf = App::make('snappy.pdf.wrapper')
-            ->loadHTML($htmlBody)
-            ->setPaper('a4')
-            ->setOption('margin-bottom', 0)
-            ->setOption('margin-top', 0)
-            ->setOption('margin-left', 0)
-            ->setOption('margin-right', 0);
+            $pdf = App::make('snappy.pdf.wrapper')
+                ->loadHTML($htmlBody)
+                ->setPaper('a4')
+                ->setOption('margin-bottom', 0)
+                ->setOption('margin-top', 0)
+                ->setOption('margin-left', 0)
+                ->setOption('margin-right', 0);
 
-        $filePath = static::makePdfBodyPath($gmail->mail_id, $gmail->user_id).'/'.$gmail->mail_id.'.pdf';
+            $filePath = static::makePdfBodyPath($gmail->mail_id, $gmail->user_id).'/'.$gmail->mail_id.'.pdf';
 
-        Storage::disk('local')->put($filePath, $pdf->output());
+            Storage::disk('local')->put($filePath, $pdf->output());
 
-        $gmail->update(['pdf_body_path' => $filePath]);
+            $gmail->update(['pdf_body_path' => $filePath]);
 
-        return $filePath;
+            return $filePath;
+
+        } catch (\Exception $e) {
+            \Log::info(print_r([$e->getMessage(), $e->getTraceAsString()], true));
+        }
 
     }
 
@@ -178,14 +184,20 @@ class GmailService
                 }
             }
         } catch (\Exception $e) { // @todo use google exception
-            \Log::info(print_r($e->getMessage(), true));
+            \Log::info(print_r([$e->getMessage(), $e->getTraceAsString()], true));
             return []; // handle different errors
         }
     }
 
     private static function checkRegex($str, $regex)
     {
-        return preg_match($regex, $str, $result);
+        try {
+             return preg_match($regex, $str, $result);
+        } catch (\Exception $e) {
+            \Log::info(print_r([$e->getMessage(), $e->getTraceAsString()], true));
+        }
+
+        return false;
     }
 
 

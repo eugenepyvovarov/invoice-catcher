@@ -28,7 +28,7 @@
                             <div class="form-group row">
                                 <label for="filter" class="col-md-10 col-form-label">{{ __('Filter') }}
                                     <a href="https://support.google.com/mail/answer/7190" target="_blank">(?)</a>
-                                *</label>
+                                </label>
 
                                 <div class="col-md-10">
                                     <textarea

@@ -25,8 +25,8 @@ class GmailFilterRequest extends FormRequest
     {
         return [
             'name' => ['required'],
-            'filter' => ['required_without:regex', 'nullable'],
-            'regex' => ['string', 'required_without:filter', 'nullable'],
+            'filter' => ['nullable'],
+            'regex' => ['string', 'nullable'],
             'reload_data' => ['boolean', 'nullable'],
         ];
     }

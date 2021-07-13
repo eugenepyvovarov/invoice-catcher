@@ -16,7 +16,7 @@ class GmailFilterController extends Controller
      */
     public function index()
     {
-        $filters = auth()->user()->gmailFilters()->get();
+        $filters = auth()->user()->gmailFilters()->latest('id')->get();
         return view('gmail.filters.index', compact('filters'));
     }
 
