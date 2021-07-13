@@ -150,9 +150,9 @@
             toggleDownloadBtn();
             $(document).on('change', '#filterMenu', function () {
                 if ($(this).val()) {
-                    window.location.replace('http://catcher.local/gmails?filterId='+$(this).val());
+                    window.location.replace('{{ route('gmail.mails') }}?filterId='+$(this).val());
                 } else {
-                    window.location.replace('http://catcher.local/gmails');
+                    window.location.replace('{{ route('gmail.mails') }}');
                 }
             });
 
