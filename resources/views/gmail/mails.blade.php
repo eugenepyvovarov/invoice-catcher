@@ -19,7 +19,6 @@
                                 <div class="col-md-12">
                                     Filter:
                                     <select id="filterMenu" name="filterId" class="form-control">
-                                        <option value="">-</option>
                                         @foreach($gmailFilters as $gmailFilter)
                                             <option
                                                     value="{{ $gmailFilter->id }}"

@@ -82,19 +82,31 @@ class GmailController extends Controller
     {
         $authUser = auth()->user();
         $gmailsQuery = $authUser->gmails();
+
+        $gmailDefaultFilter = $authUser->gmailFilters()->where('is_default', true)->first();
+
         $filter = '';
-        if ($request->get('filterId')) {
-            $filter = $authUser->gmailFilters()->findOrFail($request->get('filterId'));
-            $filter = $filter->filter;
-            $gmailsQuery->where('gmail_filter_id', $request->get('filterId'));
+        if ($filterId = $request->get('filterId')) {
+            $gmailFilter = $authUser->gmailFilters()->findOrFail($request->get('filterId'));
+            $filter = $gmailFilter->filter;
+        } elseif ($gmailDefaultFilter) {
+            $filterId = $gmailDefaultFilter->id;
+        } elseif ($gmailFilter = $authUser->gmailFilters()->latest('id')->first()) {
+            $filterId = $gmailFilter->id;
         }
-        $gmails = $gmailsQuery->with(['gmailFilter'])->orderBy('date', 'desc')->paginate(500);
 
-        $gmailAllFilter = $authUser->gmailFilters()->where('name', 'All')->latest()->first();
-        $gmailFilters = $authUser->gmailFilters()->where('id', '!=', $gmailAllFilter->id)->latest()->limit(10)->get();
-        $gmailFilters->prepend($gmailAllFilter);
+        $gmails = $gmailsQuery->where('gmail_filter_id', $filterId)
+            ->with(['gmailFilter'])
+            ->orderBy('date', 'desc')
+            ->paginate(500);
 
-        return view('gmail.mails', compact('gmails', 'gmailFilters', 'gmailAllFilter', 'filter'));
+        $gmailFilters = $authUser->gmailFilters()->where('is_default', false)->latest()->limit(10)->get();
+
+        if ($gmailDefaultFilter) {
+            $gmailFilters->prepend($gmailDefaultFilter);
+        }
+
+        return view('gmail.mails', compact('gmails', 'gmailFilters', 'filter'));
     }
 
     /**

@@ -24,24 +24,50 @@
                                     <th scope="col">Filter</th>
                                     <th scope="col">Regex</th>
                                     <th scope="col">Mails</th>
-                                    <th width="140px">Actions</th>
+                                    <th width="90">Actions</th>
                                 </tr>
                                 </thead>
                                 <tbody>
-                                @foreach($filters as $filter)
+                                @if($gmailDefaultFilter)
+                                <tr>
+                                    <td>{{ $gmailDefaultFilter->name }}
+                                        <span style="background-color: lightblue; padding: 0px 3px 0px 3px">default</span>
+                                    </td>
+                                    <td>{{ $gmailDefaultFilter->filter }}</td>
+                                    <td>{{ $gmailDefaultFilter->regex }}</td>
+                                    <td>
+                                        <a href="{{ route('gmail.mails', ['filterId' => $gmailDefaultFilter->id]) }}">
+                                            {{ $gmailDefaultFilter->gmails_count }}
+                                        </a>
+                                    </td>                                    <td>
+                                        <a href="{{ route('gmailFilter.edit', $gmailDefaultFilter->id) }}" class="btn btn-sm btn-default"><i class="fas fa-edit"></i></a>
+                                        <form method="POST" action="{{ route('gmailFilter.delete', $gmailDefaultFilter->id) }}" style="display:inline">
+                                            <button class="btn btn-sm btn-default"
+                                                    onclick="return confirm('Delete filter: {{ $gmailDefaultFilter->name }}?')"
+                                                    type="submit"
+                                                    title="Remove #{{ $gmailDefaultFilter->id }}"><i class="fas fa-trash-alt"></i></button>
+                                            @csrf
+                                        </form>
+                                    </td>
+                                </tr>
+                                @endif
+                                @foreach($gmailFilters as $gmailFilter)
                                     <tr>
-                                        <td>{{ $filter->name }}</td>
-                                        <td>{{ $filter->filter }}</td>
-                                        <td>{{ $filter->regex }}</td>
-                                        <td>{{ $filter->gmails_count }}</td>
+                                        <td>{{ $gmailFilter->name }}</td>
+                                        <td>{{ $gmailFilter->filter }}</td>
+                                        <td>{{ $gmailFilter->regex }}</td>
                                         <td>
-                                            <a href="{{ route('gmail.mails', ['filterId' => $filter->id]) }}" class="btn btn-sm btn-default"><i class="fas fa-eye"></i></a>
-                                            <a href="{{ route('gmailFilter.edit', $filter->id) }}" class="btn btn-sm btn-default"><i class="fas fa-edit"></i></a>
-                                            <form method="POST" action="{{ route('gmailFilter.delete', $filter->id) }}" style="display:inline">
+                                            <a href="{{ route('gmail.mails', ['filterId' => $gmailDefaultFilter->id]) }}">
+                                                {{ $gmailFilter->gmails_count }}
+                                            </a>
+                                       </td>
+                                        <td>
+                                            <a href="{{ route('gmailFilter.edit', $gmailFilter->id) }}" class="btn btn-sm btn-default"><i class="fas fa-edit"></i></a>
+                                            <form method="POST" action="{{ route('gmailFilter.delete', $gmailFilter->id) }}" style="display:inline">
                                                 <button class="btn btn-sm btn-default"
-                                                        onclick="return confirm('Delete filter: {{ $filter->name }}?')"
+                                                        onclick="return confirm('Delete filter: {{ $gmailFilter->name }}?')"
                                                         type="submit"
-                                                        title="Remove #{{ $filter->id }}"><i class="fas fa-trash-alt"></i></button>
+                                                        title="Remove #{{ $gmailFilter->id }}"><i class="fas fa-trash-alt"></i></button>
                                                 @csrf
                                             </form>
                                         </td>

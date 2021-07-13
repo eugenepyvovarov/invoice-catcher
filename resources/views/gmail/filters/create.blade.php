@@ -60,6 +60,12 @@
                                     @enderror
                                 </div>
                             </div>
+                            <div class="form-check">
+                                <input class="form-check-input" name="is_default" type="checkbox" @if (old('is_default')) checked @endif value="1" id="is_default">
+                                <label class="form-check-label" for="is_default">
+                                    Is Default
+                                </label>
+                            </div>
                             <div class="form-group row mb-0">
                                 <div class="col-md-3">
                                     <button type="submit" class="btn btn-primary">

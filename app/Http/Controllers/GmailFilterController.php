@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\GmailFilterRequest;
 use App\Jobs\GmailInitialLoad;
+use App\Models\GmailFilter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -16,8 +17,16 @@ class GmailFilterController extends Controller
      */
     public function index()
     {
-        $filters = auth()->user()->gmailFilters()->withCount('gmails')->latest('id')->get();
-        return view('gmail.filters.index', compact('filters'));
+        $gmailFilters = auth()->user()->gmailFilters()
+            ->where('is_default', false)
+            ->withCount('gmails')
+            ->latest('id')
+            ->get();
+        $gmailDefaultFilter = auth()->user()->gmailFilters()
+            ->where('is_default', true)
+            ->withCount('gmails')
+            ->first();
+        return view('gmail.filters.index', compact('gmailFilters', 'gmailDefaultFilter'));
     }
 
     /**
@@ -36,7 +45,11 @@ class GmailFilterController extends Controller
      */
     public function store(GmailFilterRequest $request)
     {
+
        $filter = auth()->user()->gmailFilters()->create($request->validated());
+        if ($request->get('is_default')) {
+            GmailFilter::makeDefault($filter);
+        }
         return redirect()->route('gmailFilter.index');
     }
 
@@ -72,6 +85,9 @@ class GmailFilterController extends Controller
     {
         $filter = auth()->user()->gmailFilters()->findOrFail($id);
         $filter->update($request->validated());
+        if ($request->get('is_default')) {
+            GmailFilter::makeDefault($filter);
+        }
         return redirect()->route('gmailFilter.index');
     }
 
