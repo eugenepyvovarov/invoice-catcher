@@ -107,7 +107,8 @@ class GmailService
                 ->setOption('margin-bottom', 0)
                 ->setOption('margin-top', 0)
                 ->setOption('margin-left', 0)
-                ->setOption('margin-right', 0);
+                ->setOption('margin-right', 0)
+                ->setOption('encoding', 'UTF-8');
 
             $filePath = static::makePdfBodyPath($gmail->mail_id, $gmail->user_id).'/'.$gmail->mail_id.'.pdf';
 
