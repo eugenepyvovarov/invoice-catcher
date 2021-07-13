@@ -23,7 +23,8 @@
                                     <th scope="col">Name</th>
                                     <th scope="col">Filter</th>
                                     <th scope="col">Regex</th>
-                                    <th width="90px">Actions</th>
+                                    <th scope="col">Mails</th>
+                                    <th width="140px">Actions</th>
                                 </tr>
                                 </thead>
                                 <tbody>
@@ -32,7 +33,9 @@
                                         <td>{{ $filter->name }}</td>
                                         <td>{{ $filter->filter }}</td>
                                         <td>{{ $filter->regex }}</td>
+                                        <td>{{ $filter->gmails_count }}</td>
                                         <td>
+                                            <a href="{{ route('gmail.mails', ['filterId' => $filter->id]) }}" class="btn btn-sm btn-default"><i class="fas fa-eye"></i></a>
                                             <a href="{{ route('gmailFilter.edit', $filter->id) }}" class="btn btn-sm btn-default"><i class="fas fa-edit"></i></a>
                                             <form method="POST" action="{{ route('gmailFilter.delete', $filter->id) }}" style="display:inline">
                                                 <button class="btn btn-sm btn-default"

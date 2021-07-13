@@ -89,8 +89,12 @@ class GmailController extends Controller
             $gmailsQuery->where('gmail_filter_id', $request->get('filterId'));
         }
         $gmails = $gmailsQuery->with(['gmailFilter'])->orderBy('date', 'desc')->paginate(500);
-        $gmailFilters = $authUser->gmailFilters()->latest()->get();
-        return view('gmail.mails', compact('gmails', 'gmailFilters', 'filter'));
+
+        $gmailAllFilter = $authUser->gmailFilters()->where('name', 'All')->latest()->first();
+        $gmailFilters = $authUser->gmailFilters()->where('id', '!=', $gmailAllFilter->id)->latest()->limit(10)->get();
+        $gmailFilters->prepend($gmailAllFilter);
+
+        return view('gmail.mails', compact('gmails', 'gmailFilters', 'gmailAllFilter', 'filter'));
     }
 
     /**
