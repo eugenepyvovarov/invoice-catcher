@@ -28,7 +28,7 @@
                                 </tr>
                                 </thead>
                                 <tbody>
-                                @if($gmailDefaultFilter)
+                                @if(! empty($gmailDefaultFilter))
                                 <tr>
                                     <td>{{ $gmailDefaultFilter->name }}
                                         <span style="background-color: lightblue; padding: 0px 3px 0px 3px">default</span>
