@@ -38,7 +38,7 @@ class GmailController extends Controller
         $gmail = auth()->user()->gmails()->findOrFail($id);
         $gmail->delete();
         flash()->success('Mail #'.$gmail->id.' was successfully deleted');
-        return redirect()->route('gmail.mails');
+        return redirect()->back();
     }
 
     /**

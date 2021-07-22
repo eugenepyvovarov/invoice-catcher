@@ -31,13 +31,15 @@ class GmailService
             return;
         }
 
-        $gmail = $filter->gmails()->firstOrNew([
+        $gmail = $filter->gmails()->firstOrCreate([
             'gmail_filter_id' => $filter->id,
             'mail_id' => $mail->getId(),
+            'user_id' => $filter->user_id,
+
         ]);
-        if (! $gmail->id) {
+
+        if ($gmail->wasRecentlyCreated) {
             $gmail->fill([
-                'user_id' => $filter->user_id,
                 'internal_date' => $mail->getInternalDate(),
                 'date' => $mail->getDate(),
                 'labels' => $mail->getLabels(),
