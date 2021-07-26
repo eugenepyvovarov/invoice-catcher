@@ -22,7 +22,8 @@ class Gmail extends Model
         'html_body',
         'pdf_body_path',
         'attachments',
-        'date'
+        'date',
+        'fwd_date'
     ];
 
     protected $casts = [
@@ -30,6 +31,7 @@ class Gmail extends Model
         'labels' => 'array',
         'to' => 'array',
         'date' => 'datetime',
+        'fwd_date' => 'datetime',
     ];
 
     public function user()
@@ -45,6 +47,32 @@ class Gmail extends Model
     public function getAttachmentById($id)
     {
         return collect($this->attachments)->firstWhere('id', $id);
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getCleanSubjectAttribute()
+    {
+        $subject = str_replace('Fwd: ','', $this->subject);
+        $subject = str_replace('/', '_', $subject);
+        return $subject;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getCleanDateAttribute()
+    {
+        return $this->fwd_date ?: $this->date;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getCleanDateStrAttribute()
+    {
+        return $this->clean_date->format('d.m.Y');
     }
 
     public function getPdfBodyFullPath($storagePath = true)

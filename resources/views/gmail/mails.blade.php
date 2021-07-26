@@ -13,7 +13,6 @@
                         </div>
                         <div class="row">
                         <div class="col-md-8">
-
                         <form action="{{ route('gmail.load') }}" method="POST">
                             <div class="row">
                                 <div class="col-md-12">
@@ -62,10 +61,20 @@
                         </div>
                         <div class="clearfix"></div>
                         <br>
+                        <div class="row">
+                            <div class="col-md-2">
+                                <span>
+                                  <div class="btn btn-primary dowload-button" style="cursor: pointer; margin-bottom: 10px; display: none">
+                                          <i title="Download Achive" class="fa fa-download" aria-hidden="true"></i>
+                                 </div>
+                                </span>
+                            </div>
+                        </div>
                         Rows: {{ $gmails->total() }}
                         <form name="checkboxForm" action="{{ route('gmail.checkboxAction') }}" method="POST" id="gmail_checkbox_form">
                             @csrf
                         </form>
+
                         <table class="table">
                             <thead>
                             <tr>
@@ -87,7 +96,7 @@
                                     <td><input type="checkbox" class="gmail-checkbox" name="gmailIds[]" form="gmail_checkbox_form" value="{{ $gmail->id }}"/></td>
                                     <td>{{ $gmail->id }}</td>
                                     <td title="{{ $gmail->from_email }}">{{ $gmail->from_name }}</td>
-                                    <td><a href="{{ route('gmail.mailBody', $gmail->id) }}" target="_blank">{{ \Illuminate\Support\Str::limit($gmail->subject, 80)}}</a></td>
+                                    <td><a href="{{ route('gmail.mailBody', $gmail->id) }}" target="_blank">{{ \Illuminate\Support\Str::limit($gmail->clean_subject, 80)}}</a></td>
                                     <td>
                                     @if ($gmail->pdf_body_path)
                                             <a  class="btn btn-sm btn-outline-primary" title="pdf body" href="{{ route('gmail.downloadPdf', $gmail->id) }}"><i class="far fa-file-pdf"></i></a>
@@ -107,7 +116,7 @@
                                             </a>
                                         @endif
                                     </td>
-                                    <td>{{ $gmail->date->toDateTimeString() }}</td>
+                                    <td>{{ $gmail->clean_date->toDateTimeString() }}</td>
                                     <td>
                                         <form id="deleteForm{{ $gmail->id }}" method="POST" action="{{ route('gmail.delete', $gmail->id) }}" style="display:inline">
                                             <button class="btn btn-sm btn-default"
@@ -126,14 +135,10 @@
                         <div class="row">
                             <div class="col-md-2">
                                 <span style="padding-left: 10px">
-                                  <div class="btn btn-primary" id="dowload_button" style="cursor: pointer; display: none">
+                                  <div class="btn btn-primary dowload-button" style="cursor: pointer; display: none">
                                           <i title="Download Achive" class="fa fa-download" aria-hidden="true"></i>
                                  </div>
                                 </span>
-                                {{--<select id="checkbox_action" class="form-control">--}}
-                                    {{--<option></option>--}}
-                                    {{--<option value="zip">Download Zip</option>--}}
-                                {{--</select>--}}
                             </div>
                         </div>
 
@@ -174,7 +179,7 @@
                 toggleDownloadBtn();
             });
 
-            $(document).on('click', '#dowload_button', function () {
+            $(document).on('click', '.dowload-button', function () {
                 if ($(".gmail-checkbox:checkbox:checked").length > 0) {
                     $('#gmail_checkbox_form').submit();
                 }
@@ -183,12 +188,11 @@
 
         function toggleDownloadBtn() {
             if ($(".gmail-checkbox:checkbox:checked").length > 0) {
-                $('#dowload_button').show();
+                $('.dowload-button').show();
             } else {
-                $('#dowload_button').hide();
+                $('.dowload-button').hide();
             }
         }
-
 
     </script>
 @endsection

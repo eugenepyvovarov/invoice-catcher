@@ -39,16 +39,20 @@ class GmailService
         ]);
 
         if ($gmail->wasRecentlyCreated) {
+
+            $htmlBody = $mail->getHtmlBody();
+
             $gmail->fill([
                 'internal_date' => $mail->getInternalDate(),
                 'date' => $mail->getDate(),
+                'fwd_date' => self::parseFwdDate($htmlBody),
                 'labels' => $mail->getLabels(),
                 'subject' => $mail->getSubject(),
                 'from_name' => $mail->getFromName(),
                 'from_email' => $mail->getFromEmail(),
                 'to' => $mail->getTo(),
                 'delivered_to' => $mail->getDeliveredTo(),
-                'html_body' => $mail->getHtmlBody(),
+                'html_body' => $htmlBody,
                 'attachments' => $mail->hasAttachments() ? static::downloadAttachments($mail, $filter->user_id): null // todo: check why auth fails
             ]);
             $gmail->save();
@@ -201,6 +205,16 @@ class GmailService
         }
 
         return false;
+    }
+
+    /**
+     * @param $str
+     * @return null|static
+     */
+    private static function parseFwdDate($str)
+    {
+        preg_match('/class="gmail_quote"(.*?)Forwarded message(.*?)Date:(.*?)</', $str, $res);
+        return isset($res[3]) ? now()->parse($res[3]) : null;
     }
 
 
