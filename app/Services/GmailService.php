@@ -53,7 +53,7 @@ class GmailService
                 'to' => $mail->getTo(),
                 'delivered_to' => $mail->getDeliveredTo(),
                 'html_body' => $htmlBody,
-                'attachments' => $mail->hasAttachments() ? static::downloadAttachments($mail, $filter->user_id): null // todo: check why auth fails
+                'attachments' => $mail->hasAttachments() ? static::downloadAttachments($mail, $gmail): null // todo: check why auth fails
             ]);
             $gmail->save();
 
@@ -66,10 +66,10 @@ class GmailService
 
     /**
      * @param Message\Mail $mail
-     * @param $userId
+     * @param GmailFilter $filter
      * @return array
      */
-    public static function downloadAttachments(Message\Mail $mail, $userId)
+    public static function downloadAttachments(Message\Mail $mail, Gmail $gmail)
     {
         $localId = 0;
         $result = [];
@@ -81,7 +81,7 @@ class GmailService
             if (! in_array(pathinfo($fileName, PATHINFO_EXTENSION), ['pdf'])) continue;
 
             $localId++;
-            $attachmentPath = static::makeAttachmentPath($mail->getId(), $localId, $userId);
+            $attachmentPath = static::makeAttachmentPath($gmail, $localId);
 
            $attachment->saveAttachmentTo($attachmentPath, $fileName);
 
@@ -104,7 +104,8 @@ class GmailService
             $htmlBody = str_replace(PHP_EOL, '', $gmail->html_body); // pdf devizion by zero issue fix
             //$htmlBody = str_replace(['cellpadding="0"', 'cellspacing="0"'], ['cellpadding="1"', 'cellspacing="1"'], $htmlBody); // pdf devizion by zero issue fix
             $htmlBody = preg_replace('/<div name="messageSignatureSection">(.*?)<blockquote type="cite"/', '<div><blockquote type="cite"', $htmlBody); // pdf devizion by zero issue fix
-            $htmlBody = preg_replace('/<blockquote(.*?)>/', '<blockquote>', $htmlBody);
+            $htmlBody = preg_replace('/<div dir="ltr" class="gmail_attr">(.*?)<\/div>/', '', $htmlBody);
+
             $htmlBody = str_replace('[PHP_EOL]', PHP_EOL, $htmlBody);
 
             $pdf = App::make('snappy.pdf.wrapper')
@@ -116,7 +117,7 @@ class GmailService
                 ->setOption('margin-right', 0)
                 ->setOption('encoding', 'UTF-8');
 
-            $filePath = static::makePdfBodyPath($gmail->mail_id, $gmail->user_id).'/'.$gmail->mail_id.'.pdf';
+            $filePath = static::makePdfBodyPath($gmail).'/'.$gmail->mail_id.'.pdf';
 
             Storage::disk('local')->put($filePath, $pdf->output());
 
@@ -130,26 +131,23 @@ class GmailService
 
     }
 
-
     /**
-     * @param $mailId
+     * @param Gmail $gmail
      * @param $localId
-     * @param $userId
      * @return string
      */
-    public static function makeAttachmentPath($mailId, $localId, $userId)
+    public static function makeAttachmentPath(Gmail $gmail, $localId)
     {
-        return 'gmail/'.date('Y/m/d').'/u'.$userId.'/m_'.$mailId.'/attachments/'.$localId;
+        return 'gmail/'.date('Y/m/d').'/u'.$gmail->user_id.'/f'.$gmail->gmail_filter_id.'/m_'.$gmail->mail_id.'/attachments/'.$localId;
     }
 
     /**
-     * @param $mailId
-     * @param $userId
+     * @param Gmail $gmail
      * @return string
      */
-    public static function makePdfBodyPath($mailId, $userId)
+    public static function makePdfBodyPath(Gmail $gmail)
     {
-        return 'gmail/'.date('Y/m/d').'/u'.$userId.'/m_'.$mailId;
+        return 'gmail/'.date('Y/m/d').'/u'.$gmail->user_id.'/f'.$gmail->gmail_filter_id.'/m_'.$gmail->mail_id;
     }
 
 
