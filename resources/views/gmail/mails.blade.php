@@ -13,7 +13,7 @@
                         </div>
                         <div class="row">
                         <div class="col-md-8">
-                        <form action="{{ route('gmail.load') }}" method="POST">
+                        <form id="mail_load_form">
                             <div class="row">
                                 <div class="col-md-12">
                                     Filter:
@@ -50,12 +50,12 @@
                             </div>
                             <div class="form-group row">
                                 <div class="col-md-10">
-                                    <button class="btn btn-primary">
+                                    <button id="load_btn" class="btn btn-primary" data-url="{{ route('gmail.ajaxLoad') }}">
                                         {{ __('Load') }}
                                     </button>
+                                    <img id="loader" src="{{ asset('img/preloader-16.gif') }}" style="display: none" />
                                 </div>
                             </div>
-                                @csrf
                             </form>
                         </div>
                         </div>
@@ -84,7 +84,6 @@
                                 <th>Subject</th>
                                 <th>PDF</th>
                                 <th>Attachments</th>
-                                <th>Filters</th>
                                 <th width="120px">Date</th>
                                 <th width="90px">Actions</th>
                             </tr>
@@ -109,13 +108,7 @@
                                             @endforeach
                                         @endif
                                     </td>
-                                    <td>
-                                        @if($gmail->gmailFilter)
-                                            <a href="{{ route('gmailFilter.edit', $gmail->gmailFilter->id) }}">
-                                                {{ $gmail->gmailFilter->name }}
-                                            </a>
-                                        @endif
-                                    </td>
+
                                     <td>{{ $gmail->clean_date->toDateTimeString() }}</td>
                                     <td>
                                         <form id="deleteForm{{ $gmail->id }}" method="POST" action="{{ route('gmail.delete', $gmail->id) }}" style="display:inline">
@@ -161,6 +154,38 @@
                 }
             });
 
+            $('#load_btn').click(function(event) {
+                var $btn = $(this);
+                $btn.attr('disabled', true);
+                $btn.text('Loading...');
+                $.ajax({
+                    headers: {
+                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                    },
+                    url: $(this).data('url'),
+                    type: "POST",
+                    data: $('#mail_load_form').serializeArray(),
+                    beforeSend: function() {
+                        $('#loader').show();
+                    },
+                    complete: function() {
+                        $('#loader').hide();
+                        $btn.attr('disabled', false);
+                        $btn.text('Load');
+                    },
+                    success: function(data) {
+                        window.location.replace(data.redirect_url);
+                    },
+                    error: function(xhr, status, error) {
+                        alert(xhr.responseJSON.message);
+                    },
+                });
+
+
+                event.preventDefault();
+
+            });
+
             $('#select-all-checkbox').click(function(event) {
                 if(this.checked) {
                     // Iterate each checkbox
@@ -193,6 +218,7 @@
                 $('.dowload-button').hide();
             }
         }
+
 
     </script>
 @endsection

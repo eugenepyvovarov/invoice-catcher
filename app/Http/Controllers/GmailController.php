@@ -44,7 +44,7 @@ class GmailController extends Controller
     /**
      * @return \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
      */
-    public function load(Request $request)
+    public function ajaxLoad(Request $request)
     {
         if (LaravelGmail::check()) {
 
@@ -70,9 +70,11 @@ class GmailController extends Controller
                     }
                 });
             }
+
+            return response()->json(['redirect_url' => route('gmail.mails', ['filterId' => $filterId])]);
         }
 
-        return redirect()->route('gmail.mails', ['filterId' => $filterId]);
+        abort(400, 'Failed to load data');
     }
 
     /**
