@@ -62,6 +62,14 @@ class Gmail extends Model
     /**
      * @return mixed
      */
+    public function getPdfBodyFileNameAttribute()
+    {
+        return $this->clean_date_str.'__'.$this->clean_subject.'__['.$this->id.'].pdf';
+    }
+
+    /**
+     * @return mixed
+     */
     public function getCleanDateAttribute()
     {
         return $this->fwd_date ?: $this->date;

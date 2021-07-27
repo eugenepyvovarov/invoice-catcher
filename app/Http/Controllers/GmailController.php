@@ -163,8 +163,7 @@ class GmailController extends Controller
     public function downloadPdf($id)
     {
         $gmail = auth()->user()->gmails()->findOrFail($id);
-
-        return Storage::download($gmail->pdf_body_path);
+        return Storage::download($gmail->pdf_body_path, $gmail->pdf_body_file_name);
     }
 
     public function checkboxAction(Request $request)
@@ -180,7 +179,7 @@ class GmailController extends Controller
             $gmails = auth()->user()->gmails()->whereIn('id', $request->get('gmailIds'))->orderBy('id')->get();
             foreach ($gmails as $gmail) {
                 if ($gmail->pdf_body_path) {
-                    $zip->addFileFromPath($gmail->clean_date_str.'__'.$gmail->clean_subject.'__['.$gmail->id.'].pdf', $gmail->getPdfBodyFullPath());
+                    $zip->addFileFromPath($gmail->pdf_body_file_name, $gmail->getPdfBodyFullPath());
                 }
 
                 if ($gmail->attachments) {
