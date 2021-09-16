@@ -9,7 +9,6 @@
                 <div class="card">
                     <div class="card-header">{{ __('My Profile') }}</div>
                     <div class="card-body">
-                        <div>Name: {{ $authUser->name }}</div>
                         <div>Email: {{ $authUser->email }}</div>
                     </div>
                 </div>
@@ -29,12 +28,6 @@
                                 <input class="form-check-input" name="models[]" type="checkbox" value="{{ \App\Models\GmailFilter::class }}" id="filter" />
                                 <label class="form-check-label" for="filter">
                                     Gmail Filters
-                                </label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" name="models[]" type="checkbox" value="{{ \App\Models\GmailProfile::class }}" id="profile" />
-                                <label class="form-check-label" for="profile">
-                                    Gmail Profile
                                 </label>
                             </div>
                             @error('models')

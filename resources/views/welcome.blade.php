@@ -22,7 +22,7 @@
     </head>
     <body class="antialiased">
     <h1>{{ \Dacastro4\LaravelGmail\Facade\LaravelGmail::user() }}</h1>
-    @if(\Dacastro4\LaravelGmail\Facade\LaravelGmail::check())
+    @if(auth()->check())
         <a href="{{ url('oauth/gmail/logout') }}">logout</a>
     @else
         <a href="{{ url('oauth/gmail') }}">login</a>

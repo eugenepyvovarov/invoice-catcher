@@ -37,4 +37,24 @@ class LoginController extends Controller
     {
         $this->middleware('guest')->except('logout');
     }
+
+    /**
+     * Create a new controller instance.
+     *
+     * @return void
+     */
+    public function login()
+    {
+        return redirect()->route('gmail.login');
+    }
+
+    /**
+     * Create a new controller instance.
+     *
+     * @return void
+     */
+    public function logout()
+    {
+        return redirect()->route('gmail.disconnect');
+    }
 }

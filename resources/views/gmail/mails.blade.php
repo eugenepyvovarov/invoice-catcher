@@ -61,6 +61,14 @@
                         </div>
                         <div class="clearfix"></div>
                         <br>
+                        <div class="form-group row">
+                            <label for="name" class="col-md-10 col-form-label">Search</label>
+
+                            <div class="col-md-3">
+                                <input id="name" type="text" class="form-control " name="name" value="" required="" autocomplete="name" autofocus="">
+
+                            </div>
+                        </div>
                         <div class="row">
                             <div class="col-md-2">
                                 <span>

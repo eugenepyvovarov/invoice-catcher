@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Jobs\CheckGmail;
 use App\Models\Gmail;
 use App\Models\GmailFilter;
+use App\Models\User;
 use App\Services\GmailService;
 use Dacastro4\LaravelGmail\Facade\LaravelGmail;
 use Dompdf\Options;
+use Illuminate\Http\File;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -15,17 +17,6 @@ use Dompdf\Dompdf;
 
 class GmailController extends Controller
 {
-
-    /**
-     * @todo add gmail auth check to middleware? with redirect
-     * @return \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
-     */
-    public function profile()
-    {
-        $gmailUser = LaravelGmail::check() ? LaravelGmail::user() : null;
-
-        return view('gmail.profile', compact('gmailUser'));
-    }
 
     /**
      * Remove the specified resource from storage.
@@ -46,35 +37,30 @@ class GmailController extends Controller
      */
     public function ajaxLoad(Request $request)
     {
-        if (LaravelGmail::check()) {
+        if ($request->get('new_filter')) {
+            $filter = auth()->user()->gmailFilters()->create([
+                'filter' => $request->get('new_filter'),
+                'name' => $request->get('new_filter')
+            ]);
+            $filterId = $filter->id;
 
-            if ($request->get('new_filter')) {
-                $filter = auth()->user()->gmailFilters()->create([
-                    'filter' => $request->get('new_filter'),
-                    'name' => $request->get('new_filter')
-                ]);
-                $filterId = $filter->id;
+            CheckGmail::dispatch($filter);
 
-                CheckGmail::dispatch($filter);
+        } elseif ($request->get('filterId')) {
+            $filterId = $request->get('filterId');
 
-            } elseif ($request->get('filterId')) {
-                $filterId = $request->get('filterId');
-
-                $filter = auth()->user()->gmailFilters()->findOrFail($filterId);
-                CheckGmail::dispatch($filter);
-            } else {
-                $filterId = null;
-                auth()->user()->gmailFilters()->chunk(100, function ($filters) {
-                    foreach ($filters as $filter) {
-                        CheckGmail::dispatch($filter);
-                    }
-                });
-            }
-
-            return response()->json(['redirect_url' => route('gmail.mails', ['filterId' => $filterId])]);
+            $filter = auth()->user()->gmailFilters()->findOrFail($filterId);
+            CheckGmail::dispatch($filter);
+        } else {
+            $filterId = null;
+            auth()->user()->gmailFilters()->chunk(100, function ($filters) {
+                foreach ($filters as $filter) {
+                    CheckGmail::dispatch($filter);
+                }
+            });
         }
 
-        abort(400, 'Failed to load data');
+        return response()->json(['redirect_url' => route('gmail.mails', ['filterId' => $filterId])]);
     }
 
     /**
@@ -139,25 +125,36 @@ class GmailController extends Controller
      * @todo move to GmailProfileController
      * @return mixed
      */
-    public function connect()
+    public function login()
     {
         return LaravelGmail::redirect();
     }
 
     public function disconnect()
     {
-        LaravelGmail::logout();
-        return redirect()->route('gmail.profile');
+        LaravelGmail::setUserId(auth()->user()->id)->logout();
+        auth()->logout();
+        return redirect()->route('home');
     }
 
     public function callback()
     {
-        LaravelGmail::makeToken();
+        $tempUserId = uniqid();
+        LaravelGmail::setUserId($tempUserId)->makeToken();
         $token = LaravelGmail::getAccessToken();
-        auth()->user()->gmailProfiles()->firstOrCreate(['email' => $token['email']]);
-        flash()->success('Profile has been successfully connected');
 
-        return redirect()->route('gmail.profile');
+        $user = User::firstOrCreate(['email' => $token['email']]);
+
+        $tempToken = 'gmail/tokens/'.config('gmail.credentials_file_name').'-'.$tempUserId.'.json';
+        $newToken = 'gmail/tokens/'.config('gmail.credentials_file_name').'-'.$user->id.'.json';
+        Storage::delete($newToken); // delete token if previous exists
+        Storage::move($tempToken, $newToken);// rename temp token to user token
+
+        auth()->login($user);
+
+        flash()->success('Gamil Profile has been successfully authenticated');
+
+        return redirect()->route('gmail.mails');
     }
 
     public function downloadPdf($id)

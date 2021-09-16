@@ -12,24 +12,14 @@ use Illuminate\Support\Facades\Route;
 | contains the "web" middleware group. Now create something great!
 |
 */
-Auth::routes();
+Auth::routes(['register' => false, 'login']);
 
-Route::get('/', function () {
-    return redirect('dashboard');
-});
+Route::get('/', [\App\Http\Controllers\HomeController::class, 'home'])->name('home');
 
+Route::get('/oauth/gmail/login', [\App\Http\Controllers\GmailController::class, 'login'])->name('gmail.login');
+Route::get('/oauth/gmail/callback', [\App\Http\Controllers\GmailController::class, 'callback'])->name('gmail.callback');
 
-Route::group(['middleware' => ['auth']], function () {
-
-    Route::get('/dashboard', function () {
-        return view('dashboard');
-    })->name('dashboard');
-
-    Route::get('/test', [\App\Http\Controllers\HomeController::class, 'test'])->name('test');
-
-      // Gamil Profile
-    Route::get('/gmail/profile', [\App\Http\Controllers\GmailController::class, 'profile'])->name('gmail.profile');
-    Route::post('/gmail/profile/clear', [\App\Http\Controllers\GmailController::class, 'clearProfile'])->name('gmail.profile.clear');
+Route::group(['middleware' => ['auth', 'gmail.auth']], function () {
 
     // User Profile
     Route::get('/profile', [\App\Http\Controllers\UserController::class, 'profile'])->name('profile');
@@ -53,10 +43,6 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('/gmail/filters/{id}/delete', [\App\Http\Controllers\GmailFilterController::class, 'destroy'])->name('gmailFilter.delete');
 
     // Auth
-    Route::get('/oauth/gmail/connect', [\App\Http\Controllers\GmailController::class, 'connect'])->name('gmail.connect');
     Route::get('/oauth/gmail/disconnect', [\App\Http\Controllers\GmailController::class, 'disconnect'])->name('gmail.disconnect');
-    Route::get('/oauth/gmail/callback', [\App\Http\Controllers\GmailController::class, 'callback'])->name('gmail.callback');
 });
-
-require __DIR__.'/auth.php';
 
