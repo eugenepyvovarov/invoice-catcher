@@ -94,4 +94,15 @@ return [
 	*/
 
 	'allow_json_encrypt' => env('GOOGLE_ALLOW_JSON_ENCRYPT', false),
+
+    /*
+	|--------------------------------------------------------------------------
+	| Allowed file extensions
+	|--------------------------------------------------------------------------
+	|
+	| Only attachments with extensions will be downloaded. comma separated
+	| e.g. pdf,xls,docx
+	*/
+
+	'allowed_extensions' => explode(',', env('GMAIl_ALLOWED_EXTENSIONS', 'pdf')),
 ];

@@ -9,24 +9,23 @@
         "barryvdh/laravel-snappy": "^0.4.8",
         "dacastro4/laravel-gmail": "^5.1",
         "doctrine/dbal": "^3.1",
+        "facade/ignition": "^2.16",
         "fideloper/proxy": "^4.4",
         "fruitcake/laravel-cors": "^2.0",
         "guzzlehttp/guzzle": "^7.0.1",
         "laracasts/flash": "^3.2",
         "laravel/framework": "^8.12",
-        "laravel/tinker": "^2.5",
         "laravel/ui": "^3.2",
-        "maennchen/zipstream-php": "^2.1",
-        "predis/predis": "^1.1"
+        "maennchen/zipstream-php": "^2.1"
     },
     "require-dev": {
-        "facade/ignition": "^2.5",
         "fakerphp/faker": "^1.9.1",
         "laravel/breeze": "^1.1",
         "laravel/sail": "^1.0.1",
         "mockery/mockery": "^1.4.2",
         "nunomaduro/collision": "^5.0",
-        "phpunit/phpunit": "^9.3.3"
+        "phpunit/phpunit": "^9.3.3",
+        "laravel/tinker": "^2.5"
     },
     "autoload": {
         "files": [

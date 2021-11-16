@@ -78,7 +78,7 @@ class GmailService
             $fileName = $attachment->getFileName();
 
             // filter by extension
-            if (! in_array(pathinfo($fileName, PATHINFO_EXTENSION), ['pdf'])) continue;
+            if (! in_array(pathinfo($fileName, PATHINFO_EXTENSION), config('gmail.allowed_extensions'))) continue;
 
             $localId++;
             $attachmentPath = static::makeAttachmentPath($gmail, $localId);

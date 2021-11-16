@@ -1,0 +1,22 @@
+services:
+  php:
+    container_name: catcher_php
+    build:
+      context: ./
+      dockerfile: Dockerfile.php-fpm
+      args:
+        LOCAL: "true"
+    volumes:
+      - ./html:/var/www/html:cached
+
+  nginx:
+    container_name: catcher_nginx
+    image: nginx:1.20.1
+    ports:
+      - "8000:80"
+    depends_on:
+      - php
+    volumes:
+      - ./config/nginx/nginx-local.conf:/etc/nginx/nginx.conf:cached
+      - ./config/nginx/parts:/etc/nginx/parts:cached
+      - ./html:/var/www/html:cached

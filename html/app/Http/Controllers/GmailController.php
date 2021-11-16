@@ -150,7 +150,7 @@ class GmailController extends Controller
         Storage::delete($newToken); // delete token if previous exists
         Storage::move($tempToken, $newToken);// rename temp token to user token
 
-        auth()->login($user);
+        auth()->login($user, true);
 
         flash()->success('Gamil Profile has been successfully authenticated');
 
