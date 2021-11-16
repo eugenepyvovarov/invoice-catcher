@@ -4,7 +4,6 @@ namespace App\Http\Requests;
 
 use App\Models\Gmail;
 use App\Models\GmailFilter;
-use App\Models\GmailProfile;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -30,7 +29,6 @@ class ClearUserDataRequest extends FormRequest
         return [
             'models.*' => [
                 Rule::in([
-                    GmailProfile::class,
                     Gmail::class,
                     GmailFilter::class,
             ])]

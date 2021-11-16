@@ -33,7 +33,9 @@ class UserController extends Controller
 
         if ($request->get('models')) {
             foreach ($request->get('models') as $model) {
-                $model::where('user_id', $authUser->id)->delete();
+                foreach ($model::where('user_id', $authUser->id)->get() as $item) {
+                    $item->delete();
+                }
             }
             flash()->success('Selected data has been cleared');
         } else {
