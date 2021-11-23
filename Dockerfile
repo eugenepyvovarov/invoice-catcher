@@ -25,6 +25,8 @@ RUN apt-get install -y \
     gd
 
 # wkhtmltopdf
+ARG WKHTMLTOPDF_URL=https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.stretch_arm64.deb
+
 RUN apt-get install -y \
     libxrender1 \
     libfontconfig1 \
@@ -36,7 +38,7 @@ RUN apt-get install -y \
     xfonts-base \
     xfonts-75dpi \
     wget \
-    && wget https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.stretch_amd64.deb -O /usr/local/bin/wkhtmltopdf \
+    && wget $WKHTMLTOPDF_URL -O /usr/local/bin/wkhtmltopdf \
     && chmod +x /usr/local/bin/wkhtmltopdf \
     && dpkg -i --force-depends /usr/local/bin/wkhtmltopdf \
     && apt -f install
@@ -47,9 +49,6 @@ RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local
 #git
 RUN apt-get install -y git
 
-# Used for code coverage reports
-RUN pecl install pcov && \
-    docker-php-ext-enable pcov
 
 # Copy needed files into the container
 COPY --chown=www-data:www-data ./html /var/www/html

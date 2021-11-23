@@ -3,7 +3,6 @@ services:
     container_name: catcher_php
     build:
       context: ./
-      dockerfile: Dockerfile.php-fpm
       args:
         LOCAL: "true"
     volumes:
