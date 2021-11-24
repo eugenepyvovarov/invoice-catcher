@@ -44,10 +44,9 @@ RUN apt-get install -y \
     && apt -f install
 
 # composer
-RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+RUN wget https://getcomposer.org/installer -O - -q \
+    | php -- --install-dir=/bin --filename=composer --quiet
 
-#git
-RUN apt-get install -y git
 
 
 # Copy needed files into the container
