@@ -207,12 +207,19 @@ class GmailService
 
     /**
      * @param $str
-     * @return null|static
+     * @return \Illuminate\Support\Carbon|null
      */
     private static function parseFwdDate($str)
     {
         preg_match('/class="gmail_quote"(.*?)Forwarded message(.*?)Date:(.*?)</', $str, $res);
-        return isset($res[3]) ? now()->parse($res[3]) : null;
+        if (isset($res[3])) {
+            try {
+                return now()->parse($res[3]);
+            } catch (\Exception $e) {
+                return null;
+            }
+        }
+        return  null;
     }
 
 
