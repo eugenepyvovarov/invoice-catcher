@@ -108,7 +108,7 @@
                                         @endif
                                     </td>
 
-                                    <td>{{ $gmail->clean_date->toDateTimeString() }}</td>
+                                    <td>{{ $gmail->clean_date?->toDateTimeString() }}</td>
                                     <td>
                                         <form id="deleteForm{{ $gmail->id }}" method="POST" action="{{ route('gmail.delete', $gmail->id) }}" style="display:inline">
                                             <button class="btn btn-sm btn-default"
