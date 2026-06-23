@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class GmailFilter extends Model
 {
@@ -19,15 +20,19 @@ class GmailFilter extends Model
         'state',
     ];
 
-    public function gmails()
+    protected function casts(): array
+    {
+        return [
+            'is_default' => 'boolean',
+        ];
+    }
+
+    public function gmails(): HasMany
     {
         return $this->hasMany(Gmail::class);
     }
 
-    /**
-     * @param GmailFilter $filter
-     */
-    public static function makeDefault(GmailFilter $filter)
+    public static function makeDefault(GmailFilter $filter): void
     {
         $filter->update(['is_default' => true]);
         self::where('user_id', $filter->user_id)

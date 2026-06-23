@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class CreateGmailsTable extends Migration
+return new class extends Migration
 {
     /**
      * Run the migrations.
@@ -19,6 +19,7 @@ class CreateGmailsTable extends Migration
             $table->unsignedBigInteger('gmail_profile_id')->nullable(); // @todo
             $table->unsignedBigInteger('gmail_filter_id')->nullable();
             $table->string('mail_id')->nullable();
+            $table->unsignedBigInteger('internal_date')->nullable();
             $table->string('from_name')->nullable();
             $table->string('from_email')->nullable();
             $table->json('labels')->nullable();
@@ -43,3 +44,4 @@ class CreateGmailsTable extends Migration
         Schema::dropIfExists('gmails');
     }
 }
+;

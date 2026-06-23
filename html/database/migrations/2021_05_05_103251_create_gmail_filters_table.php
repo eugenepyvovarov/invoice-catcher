@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class CreateGmailFiltersTable extends Migration
+return new class extends Migration
 {
     /**
      * Run the migrations.
@@ -35,3 +35,4 @@ class CreateGmailFiltersTable extends Migration
         Schema::dropIfExists('gmail_filters');
     }
 }
+;

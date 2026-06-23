@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
 
 class Gmail extends Model
@@ -11,6 +11,7 @@ class Gmail extends Model
     protected $fillable = [
         'user_id',
         'mail_id',
+        'internal_date',
         'gmail_profile_id',
         'gmail_filter_id',
         'labels',
@@ -23,23 +24,26 @@ class Gmail extends Model
         'pdf_body_path',
         'attachments',
         'date',
-        'fwd_date'
+        'fwd_date',
     ];
 
-    protected $casts = [
-        'attachments' => 'array',
-        'labels' => 'array',
-        'to' => 'array',
-        'date' => 'datetime',
-        'fwd_date' => 'datetime',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'attachments' => 'array',
+            'labels' => 'array',
+            'to' => 'array',
+            'date' => 'datetime',
+            'fwd_date' => 'datetime',
+        ];
+    }
 
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    public function gmailFilter()
+    public function gmailFilter(): BelongsTo
     {
         return $this->belongsTo(GmailFilter::class);
     }
@@ -49,60 +53,53 @@ class Gmail extends Model
         return collect($this->attachments)->firstWhere('id', $id);
     }
 
-    /**
-     * @return mixed
-     */
-    public function getCleanSubjectAttribute()
+    public function getCleanSubjectAttribute(): string
     {
-        $subject = str_replace('Fwd: ','', $this->subject);
+        $subject = str_replace('Fwd: ', '', (string) $this->subject);
         $subject = str_replace('/', '_', $subject);
+
         return $subject;
     }
 
-    /**
-     * @return mixed
-     */
-    public function getPdfBodyFileNameAttribute()
+    public function getPdfBodyFileNameAttribute(): string
     {
         return $this->clean_date_str.'__'.$this->clean_subject.'__['.$this->id.'].pdf';
     }
 
-    /**
-     * @return mixed
-     */
     public function getCleanDateAttribute()
     {
         return $this->fwd_date ?: $this->date;
     }
 
-    /**
-     * @return mixed
-     */
-    public function getCleanDateStrAttribute()
+    public function getCleanDateStrAttribute(): string
     {
-        return $this->clean_date->format('d.m.Y');
+        return $this->clean_date?->format('d.m.Y') ?? '';
     }
 
-    public function getPdfBodyFullPath($storagePath = true)
+    public function getPdfBodyFullPath($storagePath = true): ?string
     {
         if ($this->pdf_body_path) {
-            return $storagePath ? storage_path('app/'.$this->pdf_body_path) : 'app/'.$this->pdf_body_path;
+            return $storagePath ? storage_path('app/private/'.$this->pdf_body_path) : $this->pdf_body_path;
         }
+
+        return null;
     }
 
-    protected static function boot() {
+    protected static function boot(): void
+    {
         parent::boot();
 
-        static::deleting(function($gmail) {
-            if ($gmail->getPdfBodyFullPath()) {
-                Storage::delete($gmail->getPdfBodyFullPath(false));
+        static::deleting(function ($gmail) {
+            if ($gmail->pdf_body_path) {
+                Storage::disk('local')->delete($gmail->pdf_body_path);
             }
             if ($gmail->attachments) {
                 foreach ($gmail->attachments as $attachment) {
-                    Storage::delete($attachment['file_path']);
+                    if (! empty($attachment['file_path'])) {
+                        Storage::disk('local')->delete($attachment['file_path']);
+                    }
                 }
             }
         });
     }
-
 }

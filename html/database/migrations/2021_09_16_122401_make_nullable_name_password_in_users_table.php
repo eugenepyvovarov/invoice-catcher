@@ -4,32 +4,21 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class MakeNullableNamePasswordInUsersTable extends Migration
+return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     *
-     * @return void
-     */
-    public function up()
+    public function up(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->string('name')->nullable()->change();
-            $table->string('password')->nullable()->change();
-        });
+        // Users table already created with nullable name/password in L13 baseline.
+        // Kept for compatibility with historical migration order on upgraded DBs.
+        if (Schema::hasTable('users')) {
+            Schema::table('users', function (Blueprint $table) {
+                // no-op when columns already nullable
+            });
+        }
     }
 
-    /**
-     * Reverse the migrations.
-     *
-     * @return void
-     */
-    public function down()
+    public function down(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->string('name')->nullable(false)->change();
-            $table->string('password')->nullable(false)->change();
-
-        });
+        //
     }
-}
+};
