@@ -3,41 +3,47 @@
 namespace App\Jobs;
 
 use App\Models\GmailFilter;
-use App\Models\User;
+use App\Services\GmailLoadStatus;
 use App\Services\GmailService;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
-class CheckGmail implements ShouldQueue
+/**
+ * Dispatched after the HTTP response so the browser is not blocked during long Gmail imports.
+ */
+class CheckGmail
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable;
 
-    public $user;
-    public $gmailFilter;
+    public function __construct(public GmailFilter $gmailFilter) {}
 
-    /**
-     * CheckGmail constructor.
-     * @param GmailFilter $gmailFilter
-     */
-    public function __construct(GmailFilter $gmailFilter)
+    public function handle(): void
     {
-        $this->gmailFilter = $gmailFilter;
-    }
+        @set_time_limit(0);
+        @ini_set('max_execution_time', '0');
 
-    /**
-     * Execute the job.
-     *
-     * @return void
-     */
-    public function handle()
-    {
-        auth()->onceUsingId($this->gmailFilter->user_id);// @todo remove when gmail->saveAattacment auth issue is fixed
-        $latestGmail = $this->gmailFilter->gmails()->orderBy('date', 'DESC')->first();
-        $after = $latestGmail ? $latestGmail->date->format('Y/m/d') : null;
-        GmailService::getMailByFilter($this->gmailFilter, null, $after);
+        $filterId = $this->gmailFilter->id;
+        GmailLoadStatus::markRunning($filterId, 'Connecting to Gmail…');
+
+        try {
+            auth()->onceUsingId($this->gmailFilter->user_id);
+            $latestGmail = $this->gmailFilter->gmails()->orderBy('date', 'DESC')->first();
+            $after = $latestGmail && $latestGmail->date
+                ? $latestGmail->date->format('Y/m/d')
+                : null;
+
+            $stats = GmailService::getMailByFilter($this->gmailFilter, null, $after, $filterId);
+            GmailLoadStatus::markDone(
+                $filterId,
+                $stats['listed_count'] ?? 0,
+                $stats['saved_count'] ?? 0
+            );
+        } catch (\Throwable $e) {
+            Log::error('CheckGmail failed', [
+                'filter_id' => $filterId,
+                'error' => $e->getMessage(),
+            ]);
+            GmailLoadStatus::markFailed($filterId, $e->getMessage());
+        }
     }
 }

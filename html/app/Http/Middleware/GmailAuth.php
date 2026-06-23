@@ -2,26 +2,25 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\GmailService;
 use Closure;
-use Dacastro4\LaravelGmail\Facade\LaravelGmail;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class GmailAuth
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \Closure  $next
-     * @return mixed
-     */
-    public function handle(Request $request, Closure $next)
+    public function handle(Request $request, Closure $next): Response
     {
-        if (LaravelGmail::check()) {
+        $user = $request->user();
+        if ($user && GmailService::authCheck($user)) {
             return $next($request);
         }
-        auth()->logout();
-        return redirect()->route('home');
 
+        // Logged in via session but Gmail token missing/invalid — send to OAuth, not /login
+        if ($user) {
+            return redirect()->route('gmail.login');
+        }
+
+        return redirect()->route('login');
     }
 }

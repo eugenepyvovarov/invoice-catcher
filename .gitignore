@@ -1,1 +1,16 @@
-/.idea/
+/vendor/
+/node_modules/
+html/vendor/
+html/node_modules/
+html/.env
+html/database/database.sqlite
+html/public/build/
+html/public/hot
+html/storage/*.key
+html/storage/logs/*
+!html/storage/logs/.gitignore
+html-legacy/
+.DS_Store
+.idea/
+.vscode/
+default.profraw

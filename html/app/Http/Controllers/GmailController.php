@@ -3,69 +3,73 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\CheckGmail;
-use App\Models\Gmail;
-use App\Models\GmailFilter;
 use App\Models\User;
+use App\Services\GmailLoadStatus;
 use App\Services\GmailService;
-use Dacastro4\LaravelGmail\Facade\LaravelGmail;
-use Dompdf\Options;
-use Illuminate\Http\File;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Dompdf\Dompdf;
+use ZipStream\ZipStream;
 
 class GmailController extends Controller
 {
-
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
     public function destroy($id)
     {
         $gmail = auth()->user()->gmails()->findOrFail($id);
         $gmail->delete();
         flash()->success('Mail #'.$gmail->id.' was successfully deleted');
+
         return redirect()->back();
     }
 
-    /**
-     * @return \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
-     */
     public function ajaxLoad(Request $request)
     {
+        $filterId = null;
+        $filtersToRun = collect();
+
         if ($request->get('new_filter')) {
             $filter = auth()->user()->gmailFilters()->create([
                 'filter' => $request->get('new_filter'),
-                'name' => $request->get('new_filter')
+                'name' => $request->get('new_filter'),
             ]);
             $filterId = $filter->id;
-
-            CheckGmail::dispatch($filter);
-
+            $filtersToRun->push($filter);
         } elseif ($request->get('filterId')) {
-            $filterId = $request->get('filterId');
-
-            $filter = auth()->user()->gmailFilters()->findOrFail($filterId);
-            CheckGmail::dispatch($filter);
+            $filterId = (int) $request->get('filterId');
+            $filtersToRun->push(auth()->user()->gmailFilters()->findOrFail($filterId));
         } else {
-            $filterId = null;
-            auth()->user()->gmailFilters()->chunk(100, function ($filters) {
+            auth()->user()->gmailFilters()->orderBy('id')->chunk(100, function ($filters) use ($filtersToRun) {
                 foreach ($filters as $filter) {
-                    CheckGmail::dispatch($filter);
+                    $filtersToRun->push($filter);
                 }
             });
+            $filterId = $filtersToRun->first()?->id;
         }
 
-        return response()->json(['redirect_url' => route('gmail.mails', ['filterId' => $filterId])]);
+        foreach ($filtersToRun as $filter) {
+            GmailLoadStatus::markQueued($filter->id, 'Queued — starting after this page loads…');
+            // Runs after the HTTP response so the UI is not blocked for minutes.
+            CheckGmail::dispatch($filter)->afterResponse();
+        }
+
+        return response()->json([
+            'redirect_url' => route('gmail.mails', array_filter(['filterId' => $filterId, 'loading' => 1])),
+            'loading' => true,
+            'filter_id' => $filterId,
+            'status' => $filterId ? GmailLoadStatus::get($filterId) : null,
+        ]);
     }
 
-    /**
-     * @return \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
-     */
+    public function loadStatus(Request $request, $filterId)
+    {
+        $filter = auth()->user()->gmailFilters()->findOrFail($filterId);
+        $status = GmailLoadStatus::get($filter->id);
+        $status['row_count'] = $filter->gmails()->count();
+        $status['active'] = GmailLoadStatus::isActive($status);
+
+        return response()->json($status);
+    }
+
     public function mails(Request $request)
     {
         $authUser = auth()->user();
@@ -74,9 +78,11 @@ class GmailController extends Controller
         $gmailDefaultFilter = $authUser->gmailFilters()->where('is_default', true)->first();
 
         $filter = '';
-        if ($filterId = $request->get('filterId')) {
+        $filterId = null;
+        if ($request->get('filterId')) {
             $gmailFilter = $authUser->gmailFilters()->findOrFail($request->get('filterId'));
             $filter = $gmailFilter->filter;
+            $filterId = $gmailFilter->id;
         } elseif ($gmailDefaultFilter) {
             $filterId = $gmailDefaultFilter->id;
         } elseif ($gmailFilter = $authUser->gmailFilters()->latest('id')->first()) {
@@ -94,14 +100,13 @@ class GmailController extends Controller
             $gmailFilters->prepend($gmailDefaultFilter);
         }
 
-        return view('gmail.mails', compact('gmails', 'gmailFilters', 'filter'));
+        $loadStatus = $filterId ? GmailLoadStatus::get((int) $filterId) : null;
+        $loadActive = GmailLoadStatus::isActive($loadStatus)
+            || $request->boolean('loading');
+
+        return view('gmail.mails', compact('gmails', 'gmailFilters', 'filter', 'filterId', 'loadStatus', 'loadActive'));
     }
 
-    /**
-     * @param $mailId
-     * @param $attachmentId
-     * @return mixed
-     */
     public function downloadAttachment($mailId, $attachmentId)
     {
         $gmail = auth()->user()->gmails()->findOrFail($mailId);
@@ -109,50 +114,80 @@ class GmailController extends Controller
             abort(404);
         }
 
-        return Storage::download($attachment['file_path']);
+        return Storage::disk('local')->download($attachment['file_path']);
     }
 
-    /**
-     * @return \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
-     */
     public function mailBody($id)
     {
         $gmail = auth()->user()->gmails()->findOrFail($id);
+
         return $gmail->html_body;
     }
 
-    /**
-     * @todo move to GmailProfileController
-     * @return mixed
-     */
     public function login()
     {
-        return LaravelGmail::redirect();
+        return redirect()->away(GmailService::getAuthUrl());
     }
 
     public function disconnect()
     {
-        LaravelGmail::setUserId(auth()->user()->id)->logout();
+        GmailService::disconnect(auth()->user());
         auth()->logout();
+
         return redirect()->route('home');
     }
 
-    public function callback()
+    public function callback(Request $request)
     {
-        $tempUserId = uniqid();
-        LaravelGmail::setUserId($tempUserId)->makeToken();
-        $token = LaravelGmail::getAccessToken();
+        if ($request->get('error')) {
+            flash()->error('Gmail authentication failed: '.$request->get('error'));
 
-        $user = User::firstOrCreate(['email' => $token['email']]);
+            return redirect()->route('login');
+        }
 
-        $tempToken = 'gmail/tokens/'.config('gmail.credentials_file_name').'-'.$tempUserId.'.json';
-        $newToken = 'gmail/tokens/'.config('gmail.credentials_file_name').'-'.$user->id.'.json';
-        Storage::delete($newToken); // delete token if previous exists
-        Storage::move($tempToken, $newToken);// rename temp token to user token
+        $code = $request->get('code');
+        if (! $code) {
+            flash()->error('Missing OAuth authorization code');
+
+            return redirect()->route('login');
+        }
+
+        try {
+            $result = GmailService::handleOAuthCallback($code);
+        } catch (\Throwable $e) {
+            \Log::error('Gmail OAuth callback failed', ['error' => $e->getMessage()]);
+            flash()->error('Gmail authentication failed: '.$e->getMessage());
+
+            return redirect()->route('login');
+        }
+
+        $token = $result['token'];
+        $email = $result['email'] ?? ($token['email'] ?? null);
+
+        if (! $email) {
+            flash()->error('Could not determine Google account email. Ensure openid/email scopes are granted, then try again.');
+
+            return redirect()->route('login');
+        }
+
+        $tempUserId = 'tmp_'.uniqid('', true);
+        GmailService::storeToken($tempUserId, $token);
+
+        $user = User::firstOrCreate(
+            ['email' => $email],
+            ['name' => $email, 'password' => null]
+        );
+        GmailService::moveToken($tempUserId, $user->id);
+
+        // Ensure token is definitely stored under the real user id even if move failed
+        if (! app(\App\Services\Gmail\GmailTokenStore::class)->exists($user->id)) {
+            GmailService::storeToken($user->id, $token);
+        }
 
         auth()->login($user, true);
+        $request->session()->regenerate();
 
-        flash()->success('Gamil Profile has been successfully authenticated');
+        flash()->success('Gmail profile has been successfully authenticated');
 
         return redirect()->route('gmail.mails');
     }
@@ -160,34 +195,45 @@ class GmailController extends Controller
     public function downloadPdf($id)
     {
         $gmail = auth()->user()->gmails()->findOrFail($id);
-        return Storage::download($gmail->pdf_body_path, $gmail->pdf_body_file_name);
+
+        return Storage::disk('local')->download($gmail->pdf_body_path, $gmail->pdf_body_file_name);
     }
 
     public function checkboxAction(Request $request)
     {
-        $zipFileName = 'report.zip';
         $gmailIds = $request->get('gmailIds');
 
-        if ($gmailIds) {
-            $options = new \ZipStream\Option\Archive();
-            $options->setSendHttpHeaders(true);
-            $zip = new \ZipStream\ZipStream($zipFileName, $options);
+        if (! $gmailIds) {
+            return response('No mails selected', 400);
+        }
 
-            $gmails = auth()->user()->gmails()->whereIn('id', $request->get('gmailIds'))->orderBy('id')->get();
-            foreach ($gmails as $gmail) {
-                if ($gmail->pdf_body_path) {
-                    $zip->addFileFromPath($gmail->pdf_body_file_name, $gmail->getPdfBodyFullPath());
-                }
+        $zipFileName = 'report.zip';
+        $zip = new ZipStream(outputName: $zipFileName, sendHttpHeaders: true);
 
-                if ($gmail->attachments) {
-                    $attachmentsCount = count($gmail->attachments);
-                    foreach ($gmail->attachments as $attachment) {
-                        $attahcmentIdStr = $attachmentsCount > 1 ? '.'.$attachment['id'] : '';
-                        $zip->addFileFromPath($gmail->clean_date_str.'__'.Str::replaceLast('.', '__['.$gmail->id.$attahcmentIdStr.'].', $attachment['file_name']), storage_path('app/'.$attachment['file_path']));
+        $gmails = auth()->user()->gmails()->whereIn('id', $gmailIds)->orderBy('id')->get();
+        foreach ($gmails as $gmail) {
+            if ($gmail->pdf_body_path && Storage::disk('local')->exists($gmail->pdf_body_path)) {
+                $zip->addFileFromPath(
+                    $gmail->pdf_body_file_name,
+                    Storage::disk('local')->path($gmail->pdf_body_path)
+                );
+            }
+
+            if ($gmail->attachments) {
+                $attachmentsCount = count($gmail->attachments);
+                foreach ($gmail->attachments as $attachment) {
+                    if (empty($attachment['file_path']) || ! Storage::disk('local')->exists($attachment['file_path'])) {
+                        continue;
                     }
+                    $attachmentIdStr = $attachmentsCount > 1 ? '.'.$attachment['id'] : '';
+                    $name = $gmail->clean_date_str.'__'.Str::replaceLast('.', '__['.$gmail->id.$attachmentIdStr.'].', $attachment['file_name']);
+                    $zip->addFileFromPath($name, Storage::disk('local')->path($attachment['file_path']));
                 }
             }
-            $zip->finish();
         }
+
+        $zip->finish();
+
+        return response('', 200);
     }
 }

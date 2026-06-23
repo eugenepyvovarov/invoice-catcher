@@ -1,78 +1,77 @@
-FROM php:8.0.11-fpm-buster
+FROM php:8.5-fpm-bookworm
 
-RUN apt-get update -y && \
-    docker-php-ext-install \
-    opcache \
-    bcmath \
-    pdo \
-    pdo_mysql
+ARG DEBIAN_FRONTEND=noninteractive
+ARG TARGETARCH
+ARG WKHTMLTOPDF_VERSION=0.12.6.1-3
+ARG WKHTMLTOPDF_URL
 
-#zip
-RUN apt-get install -y \
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        fontconfig \
+        libfontconfig1 \
+        libfreetype6-dev \
+        libjpeg62-turbo \
+        libjpeg62-turbo-dev \
+        libpng-dev \
+        libx11-6 \
+        libxrender1 \
+        libxtst6 \
         libzip-dev \
-        zip \
-  && docker-php-ext-install zip
+        wget \
+        xfonts-75dpi \
+        xfonts-base \
+        zip; \
+    # opcache is often already compiled into official PHP 8.x images; enable only if present as source ext
+    if [ -d /usr/src/php/ext/opcache ]; then docker-php-ext-install opcache; fi; \
+    docker-php-ext-install bcmath pdo pdo_mysql zip; \
+    docker-php-ext-configure gd --with-freetype --with-jpeg; \
+    docker-php-ext-install gd; \
+    docker-php-ext-enable opcache 2>/dev/null || true; \
+    rm -rf /var/lib/apt/lists/*
 
-# GD Not needed by actual application, only for mocking files for testing
-RUN apt-get install -y \
-    libfreetype6-dev \
-    libjpeg62-turbo-dev \
-    libpng-dev \
-    && \
-    docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && \
-    docker-php-ext-install \
-    gd
+RUN set -eux; \
+    if [ -z "${WKHTMLTOPDF_URL:-}" ]; then \
+        case "${TARGETARCH}" in \
+            amd64) \
+                WKHTMLTOPDF_URL="https://github.com/wkhtmltopdf/packaging/releases/download/${WKHTMLTOPDF_VERSION}/wkhtmltox_${WKHTMLTOPDF_VERSION}.bookworm_amd64.deb" \
+                ;; \
+            arm64) \
+                WKHTMLTOPDF_URL="https://github.com/wkhtmltopdf/packaging/releases/download/${WKHTMLTOPDF_VERSION}/wkhtmltox_${WKHTMLTOPDF_VERSION}.bookworm_arm64.deb" \
+                ;; \
+            *) \
+                echo "Unsupported TARGETARCH: ${TARGETARCH}. Pass WKHTMLTOPDF_URL build-arg." >&2; \
+                exit 1 \
+                ;; \
+        esac; \
+    fi; \
+    wget -O /tmp/wkhtmltox.deb "${WKHTMLTOPDF_URL}"; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends /tmp/wkhtmltox.deb || apt-get install -y -f /tmp/wkhtmltox.deb; \
+    rm -f /tmp/wkhtmltox.deb; \
+    rm -rf /var/lib/apt/lists/*; \
+    ln -sf /usr/local/bin/wkhtmltopdf /usr/bin/wkhtmltopdf || true
 
-# wkhtmltopdf
-ARG WKHTMLTOPDF_URL=https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.stretch_arm64.deb
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 
-RUN apt-get install -y \
-    libxrender1 \
-    libfontconfig1 \
-    libx11-dev \
-    libjpeg62 \
-    libxtst6 \
-    fontconfig \ 
-    libjpeg62-turbo \
-    xfonts-base \
-    xfonts-75dpi \
-    wget \
-    && wget $WKHTMLTOPDF_URL -O /usr/local/bin/wkhtmltopdf \
-    && chmod +x /usr/local/bin/wkhtmltopdf \
-    && dpkg -i --force-depends /usr/local/bin/wkhtmltopdf \
-    && apt -f install
-
-# composer
-RUN wget https://getcomposer.org/installer -O - -q \
-    | php -- --install-dir=/bin --filename=composer --quiet
-
-
-
-# Copy needed files into the container
 COPY --chown=www-data:www-data ./html /var/www/html
 COPY --chown=www-data:www-data ./config /var/config
 
-# Laravel writable
-RUN chmod -R 777 /var/www/html/bootstrap/cache
-RUN chmod -R 777 /var/www/html/storage
+RUN chmod -R 777 /var/www/html/bootstrap/cache \
+    && chmod -R 777 /var/www/html/storage
 
-# General php config
-COPY ./config/php/custom.ini /usr/local/etc/php/conf.d/custom.ini
-
-# Load some php configuration in production only, false is default - override in DC
 ARG LOCAL=false
-RUN if [ "$LOCAL" = "false" ];then \
-    # Configure php-fpm pool - should to be customized for each application
+RUN if [ "$LOCAL" = "false" ]; then \
     cp /var/config/php/www.conf /usr/local/etc/php-fpm.d/www.conf; \
-    # Configure opcache
     cp /var/config/php/opcache.ini /usr/local/etc/php/conf.d/99-opcache.ini; \
 fi
 
 COPY ./config/php/custom.ini /usr/local/etc/php/conf.d/custom.ini
 
+WORKDIR /var/www/html
+
 EXPOSE 9000
 
 VOLUME ["/var/www/html"]
 
-CMD php-fpm
+CMD ["php-fpm"]
