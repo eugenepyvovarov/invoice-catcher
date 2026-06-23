@@ -16,7 +16,7 @@ class GmailCheckCron extends Command
     {
         GmailFilter::chunk(100, function ($filters) {
             foreach ($filters as $filter) {
-                CheckGmail::dispatch($filter);
+                CheckGmail::dispatchSync($filter); // CLI/cron: run inline, not afterResponse
             }
         });
 

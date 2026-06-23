@@ -19,18 +19,27 @@ class GmailApiService
         }
 
         $token = $this->tokenStore->get($userId);
-        if (! $token) {
+        if (! $token || (empty($token['access_token']) && empty($token['refresh_token']))) {
             return false;
         }
 
         try {
             $client = $this->clientFactory->makeClient($userId);
+            $accessToken = $client->getAccessToken();
 
-            return ! empty($client->getAccessToken()) && ! $client->isAccessTokenExpired();
+            if (empty($accessToken)) {
+                return false;
+            }
+
+            // Token may have been refreshed in makeClient(); treat stored/usable token as authenticated.
+            if (! $client->isAccessTokenExpired()) {
+                return true;
+            }
+
+            return ! empty($client->getRefreshToken()) || ! empty($token['refresh_token']);
         } catch (\Throwable $e) {
             Log::warning('Gmail auth check failed', ['user_id' => $userId, 'error' => $e->getMessage()]);
 
-            // Allow offline token presence even if refresh probe fails transiently
             return isset($token['refresh_token']) || isset($token['access_token']);
         }
     }
@@ -54,18 +63,63 @@ class GmailApiService
             throw new \RuntimeException('Google OAuth error: '.($token['error_description'] ?? $token['error']));
         }
 
+        // Preserve refresh_token if Google only returns it on first consent.
         $client->setAccessToken($token);
-        $email = null;
+        $email = $this->resolveAccountEmail($client, $token);
+        if ($email) {
+            $token['email'] = $email;
+        }
+
+        return ['token' => $token, 'email' => $email];
+    }
+
+    /**
+     * Resolve the signed-in account email via OAuth2 userinfo or Gmail profile.
+     */
+    protected function resolveAccountEmail(\Google\Client $client, array $token): ?string
+    {
+        if (! empty($token['email']) && filter_var($token['email'], FILTER_VALIDATE_EMAIL)) {
+            return $token['email'];
+        }
+
+        // id_token (openid scope) often includes email without an extra API call
+        if (! empty($token['id_token'])) {
+            try {
+                $parts = explode('.', $token['id_token']);
+                if (count($parts) >= 2) {
+                    $payload = json_decode(base64_decode(strtr($parts[1], '-_', '+/')) ?: '', true);
+                    if (is_array($payload) && ! empty($payload['email'])) {
+                        return $payload['email'];
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::debug('Could not parse id_token email', ['error' => $e->getMessage()]);
+            }
+        }
 
         try {
             $oauth2 = $this->clientFactory->makeOauth2Service($client);
             $email = $oauth2->userinfo->get()->getEmail();
-            $token['email'] = $email;
+            if ($email) {
+                return $email;
+            }
         } catch (\Throwable $e) {
             Log::warning('Could not fetch Google userinfo email', ['error' => $e->getMessage()]);
         }
 
-        return ['token' => $token, 'email' => $email];
+        // Works with gmail.readonly without userinfo scopes
+        try {
+            $gmail = new GmailServiceApi($client);
+            $profile = $gmail->users->getProfile('me');
+            $email = $profile->getEmailAddress();
+            if ($email) {
+                return $email;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Could not fetch Gmail profile email', ['error' => $e->getMessage()]);
+        }
+
+        return null;
     }
 
     public function storeToken(int|string $userId, array $token): void

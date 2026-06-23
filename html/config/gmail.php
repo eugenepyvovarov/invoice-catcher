@@ -11,14 +11,21 @@ return [
     'project_id' => env('GOOGLE_PROJECT_ID'),
     'client_id' => env('GOOGLE_CLIENT_ID'),
     'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+    // Prefer absolute URL, e.g. http://localhost:8000/oauth/gmail/callback
+    // Relative paths (e.g. /oauth/gmail/callback) are resolved against APP_URL at runtime.
     'redirect_url' => env('GOOGLE_REDIRECT_URI', '/oauth/gmail/callback'),
 
     /*
     |--------------------------------------------------------------------------
-    | OAuth scopes (URL form; readonly is default)
+    | OAuth scopes (URL form)
     |--------------------------------------------------------------------------
+    | openid/email/profile are required to identify the signed-in user for app login.
+    | gmail.readonly is required to list/read messages.
     */
     'scopes' => [
+        'openid',
+        'email',
+        'profile',
         'https://www.googleapis.com/auth/gmail.readonly',
     ],
 

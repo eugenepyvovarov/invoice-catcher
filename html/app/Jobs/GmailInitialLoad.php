@@ -4,12 +4,11 @@ namespace App\Jobs;
 
 use App\Models\GmailFilter;
 use App\Services\GmailService;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Foundation\Bus\Dispatchable;
 
-class GmailInitialLoad implements ShouldQueue
+class GmailInitialLoad
 {
-    use Queueable;
+    use Dispatchable;
 
     public function __construct(public GmailFilter $gmailFilter) {}
 
@@ -18,7 +17,9 @@ class GmailInitialLoad implements ShouldQueue
         auth()->onceUsingId($this->gmailFilter->user_id);
 
         $latestGmail = $this->gmailFilter->gmails()->orderBy('date')->first();
-        $before = $latestGmail ? $latestGmail->date->addDay()->format('Y/m/d') : null;
+        $before = $latestGmail && $latestGmail->date
+            ? $latestGmail->date->copy()->addDay()->format('Y/m/d')
+            : null;
         GmailService::getMailByFilter($this->gmailFilter, $before);
     }
 }

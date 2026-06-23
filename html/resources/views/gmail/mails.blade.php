@@ -49,16 +49,54 @@
                                 </div>
                             </div>
                             <div class="form-group row">
-                                <div class="col-md-10">
-                                    <button id="load_btn" class="btn btn-primary" data-url="{{ route('gmail.ajaxLoad') }}">
-                                        {{ __('Load') }}
+                                <div class="col-md-10 d-flex align-items-center flex-wrap" style="gap: 8px;">
+                                    <button id="load_btn" type="button" class="btn btn-primary"
+                                            data-url="{{ route('gmail.ajaxLoad') }}"
+                                            data-status-url="{{ $filterId ? route('gmail.loadStatus', $filterId) : '' }}"
+                                            @if(!empty($loadActive)) disabled @endif>
+                                        {{ !empty($loadActive) ? __('Loading…') : __('Load') }}
                                     </button>
-                                    <img id="loader" src="{{ asset('img/preloader-16.gif') }}" style="display: none" />
+                                    <span id="loader" class="spinner-border spinner-border-sm text-primary" role="status"
+                                          style="{{ !empty($loadActive) ? '' : 'display:none' }}" aria-hidden="true"></span>
+                                    <small class="text-muted" id="load_hint">
+                                        Large date ranges can take 1–2 minutes (Gmail rate limits + PDF/attachments).
+                                        Prefer <code>after:2026/05/01 before:2026/06/01 in:anywhere</code> (YYYY/MM/DD).
+                                    </small>
                                 </div>
                             </div>
                             </form>
                         </div>
                         </div>
+
+                        <div id="load_status_panel"
+                             class="alert {{ !empty($loadActive) ? 'alert-info' : (isset($loadStatus['status']) && $loadStatus['status'] === 'done' ? 'alert-success' : (isset($loadStatus['status']) && $loadStatus['status'] === 'failed' ? 'alert-danger' : 'alert-secondary')) }}"
+                             style="{{ !empty($loadActive) || (!empty($loadStatus['status']) && $loadStatus['status'] !== 'idle') ? '' : 'display:none' }}"
+                             data-filter-id="{{ $filterId }}"
+                             data-status-url="{{ $filterId ? route('gmail.loadStatus', $filterId) : '' }}"
+                             data-poll="{{ !empty($loadActive) ? '1' : '0' }}">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong id="load_status_title">Gmail load</strong>
+                                    <div id="load_status_message" class="mb-1">{{ $loadStatus['message'] ?? 'Starting…' }}</div>
+                                    <small class="text-muted">
+                                        Listed: <span id="load_listed_count">{{ $loadStatus['listed_count'] ?? 0 }}</span>
+                                        · New this run: <span id="load_saved_count">{{ $loadStatus['saved_count'] ?? 0 }}</span>
+                                        · In DB: <span id="load_row_count">{{ $gmails->total() }}</span>
+                                    </small>
+                                    <div id="load_status_error" class="text-danger mt-1" style="{{ !empty($loadStatus['error']) ? '' : 'display:none' }}">
+                                        {{ $loadStatus['error'] ?? '' }}
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="refresh_mails_btn" title="Refresh mail list">
+                                    Refresh list
+                                </button>
+                            </div>
+                            <div class="progress mt-2" style="height: 6px;">
+                                <div id="load_progress_bar" class="progress-bar progress-bar-striped progress-bar-animated"
+                                     role="progressbar" style="width: {{ !empty($loadActive) ? '100%' : '0%' }}"></div>
+                            </div>
+                        </div>
+
                         <div class="clearfix"></div>
                         <div class="row">
                             <div class="col-md-2">
@@ -69,7 +107,7 @@
                                 </span>
                             </div>
                         </div>
-                        Rows: {{ $gmails->total() }}
+                        Rows: <span id="rows_total">{{ $gmails->total() }}</span>
                         <form name="checkboxForm" action="{{ route('gmail.checkboxAction') }}" method="POST" id="gmail_checkbox_form">
                             @csrf
                         </form>
@@ -144,7 +182,12 @@
 @section('scripts')
     <script>
         $(function() {
+            var pollTimer = null;
+            var lastRowCount = {{ (int) $gmails->total() }};
+            var statusUrlTemplate = @json($filterId ? route('gmail.loadStatus', ['filterId' => '__ID__']) : '');
+
             toggleDownloadBtn();
+
             $(document).on('change', '#filterMenu', function () {
                 if ($(this).val()) {
                     window.location.replace('{{ route('gmail.mails') }}?filterId='+$(this).val());
@@ -153,41 +196,155 @@
                 }
             });
 
+            $('#refresh_mails_btn').on('click', function () {
+                var fid = $('#filterMenu').val() || '{{ $filterId }}';
+                var url = '{{ route('gmail.mails') }}' + (fid ? ('?filterId=' + fid) : '');
+                window.location.replace(url);
+            });
+
             $('#load_btn').click(function(event) {
+                event.preventDefault();
                 var $btn = $(this);
-                $btn.attr('disabled', true);
-                $btn.text('Loading...');
+                if ($btn.prop('disabled')) {
+                    return;
+                }
+
+                $btn.prop('disabled', true).text('Starting…');
+                $('#loader').show();
+                $('#load_status_panel').show().removeClass('alert-success alert-danger alert-secondary').addClass('alert-info');
+                $('#load_status_title').text('Gmail load');
+                $('#load_status_message').text('Starting import in the background…');
+                $('#load_status_error').hide().text('');
+                $('#load_progress_bar').css('width', '100%').addClass('progress-bar-animated progress-bar-striped');
+
                 $.ajax({
                     headers: {
                         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                     },
-                    url: $(this).data('url'),
-                    type: "POST",
+                    url: $btn.data('url'),
+                    type: 'POST',
                     data: $('#mail_load_form').serializeArray(),
-                    beforeSend: function() {
-                        $('#loader').show();
-                    },
-                    complete: function() {
-                        $('#loader').hide();
-                        $btn.attr('disabled', false);
-                        $btn.text('Load');
-                    },
                     success: function(data) {
-                        window.location.replace(data.redirect_url);
+                        if (data.redirect_url) {
+                            // Land on mails page with loading=1; background work continues via afterResponse
+                            window.location.replace(data.redirect_url);
+                            return;
+                        }
+                        startPolling(data.filter_id);
                     },
-                    error: function(xhr, status, error) {
-                        alert(xhr.responseJSON.message);
-                    },
+                    error: function(xhr) {
+                        $('#loader').hide();
+                        $btn.prop('disabled', false).text('Load');
+                        $('#load_status_panel').removeClass('alert-info').addClass('alert-danger').show();
+                        var msg = (xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error)) || xhr.statusText || 'Request failed';
+                        $('#load_status_message').text('Could not start load.');
+                        $('#load_status_error').text(msg).show();
+                        $('#load_progress_bar').removeClass('progress-bar-animated').css('width', '0%');
+                    }
                 });
-
-
-                event.preventDefault();
-
             });
+
+            if ($('#load_status_panel').data('poll') == '1') {
+                var fid = $('#load_status_panel').data('filter-id');
+                if (fid) {
+                    startPolling(fid);
+                }
+            }
+
+            function statusUrlFor(filterId) {
+                var base = $('#load_status_panel').data('status-url');
+                if (base) {
+                    return base;
+                }
+                if (statusUrlTemplate && filterId) {
+                    return statusUrlTemplate.replace('__ID__', filterId);
+                }
+                return null;
+            }
+
+            function startPolling(filterId) {
+                var url = statusUrlFor(filterId);
+                if (!url) {
+                    return;
+                }
+                if (pollTimer) {
+                    clearInterval(pollTimer);
+                }
+                $('#loader').show();
+                $('#load_btn').prop('disabled', true).text('Loading…');
+                pollOnce(url);
+                pollTimer = setInterval(function () { pollOnce(url); }, 2000);
+            }
+
+            function pollOnce(url) {
+                $.getJSON(url)
+                    .done(function (status) {
+                        applyStatus(status);
+                        if (!status.active) {
+                            if (pollTimer) {
+                                clearInterval(pollTimer);
+                                pollTimer = null;
+                            }
+                            $('#loader').hide();
+                            $('#load_btn').prop('disabled', false).text('Load');
+                            $('#load_progress_bar').removeClass('progress-bar-animated progress-bar-striped');
+
+                            if (status.status === 'done') {
+                                $('#load_progress_bar').css('width', '100%');
+                                // Auto-refresh list once when finished so new rows appear without manual click
+                                var fid = status.filter_id || $('#filterMenu').val();
+                                var target = '{{ route('gmail.mails') }}' + (fid ? ('?filterId=' + fid + '&loaded=1') : '?loaded=1');
+                                if ((status.row_count || 0) !== lastRowCount || status.saved_count > 0) {
+                                    setTimeout(function () { window.location.replace(target); }, 600);
+                                }
+                            } else if (status.status === 'failed') {
+                                $('#load_progress_bar').css('width', '100%').addClass('bg-danger');
+                            }
+                        } else {
+                            // Soft-refresh row count in banner only
+                            if (typeof status.row_count !== 'undefined') {
+                                $('#load_row_count').text(status.row_count);
+                                $('#rows_total').text(status.row_count);
+                            }
+                        }
+                    })
+                    .fail(function () {
+                        // keep polling; transient errors are ok
+                    });
+            }
+
+            function applyStatus(status) {
+                if (!status) return;
+                $('#load_status_panel').show();
+                $('#load_status_message').text(status.message || status.status || '…');
+                $('#load_listed_count').text(status.listed_count || 0);
+                $('#load_saved_count').text(status.saved_count || 0);
+                if (typeof status.row_count !== 'undefined') {
+                    $('#load_row_count').text(status.row_count);
+                }
+                if (status.error) {
+                    $('#load_status_error').text(status.error).show();
+                } else {
+                    $('#load_status_error').hide().text('');
+                }
+
+                var panel = $('#load_status_panel');
+                panel.removeClass('alert-info alert-success alert-danger alert-secondary');
+                if (status.active) {
+                    panel.addClass('alert-info');
+                    $('#load_progress_bar').addClass('progress-bar-animated progress-bar-striped bg-primary').removeClass('bg-danger').css('width', '100%');
+                } else if (status.status === 'done') {
+                    panel.addClass('alert-success');
+                    $('#load_progress_bar').removeClass('bg-danger').addClass('bg-success').css('width', '100%');
+                } else if (status.status === 'failed') {
+                    panel.addClass('alert-danger');
+                } else {
+                    panel.addClass('alert-secondary');
+                }
+            }
 
             $('#select-all-checkbox').click(function(event) {
                 if(this.checked) {
-                    // Iterate each checkbox
                     $('.gmail-checkbox:checkbox').each(function() {
                         this.checked = true;
                     });
@@ -217,7 +374,5 @@
                 $('.dowload-button').hide();
             }
         }
-
-
     </script>
 @endsection

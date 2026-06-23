@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Jobs\CheckGmail;
 use App\Models\User;
+use App\Services\GmailLoadStatus;
 use App\Services\GmailService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -23,29 +24,50 @@ class GmailController extends Controller
 
     public function ajaxLoad(Request $request)
     {
+        $filterId = null;
+        $filtersToRun = collect();
+
         if ($request->get('new_filter')) {
             $filter = auth()->user()->gmailFilters()->create([
                 'filter' => $request->get('new_filter'),
                 'name' => $request->get('new_filter'),
             ]);
             $filterId = $filter->id;
-
-            CheckGmail::dispatch($filter);
+            $filtersToRun->push($filter);
         } elseif ($request->get('filterId')) {
-            $filterId = $request->get('filterId');
-
-            $filter = auth()->user()->gmailFilters()->findOrFail($filterId);
-            CheckGmail::dispatch($filter);
+            $filterId = (int) $request->get('filterId');
+            $filtersToRun->push(auth()->user()->gmailFilters()->findOrFail($filterId));
         } else {
-            $filterId = null;
-            auth()->user()->gmailFilters()->chunk(100, function ($filters) {
+            auth()->user()->gmailFilters()->orderBy('id')->chunk(100, function ($filters) use ($filtersToRun) {
                 foreach ($filters as $filter) {
-                    CheckGmail::dispatch($filter);
+                    $filtersToRun->push($filter);
                 }
             });
+            $filterId = $filtersToRun->first()?->id;
         }
 
-        return response()->json(['redirect_url' => route('gmail.mails', ['filterId' => $filterId])]);
+        foreach ($filtersToRun as $filter) {
+            GmailLoadStatus::markQueued($filter->id, 'Queued — starting after this page loads…');
+            // Runs after the HTTP response so the UI is not blocked for minutes.
+            CheckGmail::dispatch($filter)->afterResponse();
+        }
+
+        return response()->json([
+            'redirect_url' => route('gmail.mails', array_filter(['filterId' => $filterId, 'loading' => 1])),
+            'loading' => true,
+            'filter_id' => $filterId,
+            'status' => $filterId ? GmailLoadStatus::get($filterId) : null,
+        ]);
+    }
+
+    public function loadStatus(Request $request, $filterId)
+    {
+        $filter = auth()->user()->gmailFilters()->findOrFail($filterId);
+        $status = GmailLoadStatus::get($filter->id);
+        $status['row_count'] = $filter->gmails()->count();
+        $status['active'] = GmailLoadStatus::isActive($status);
+
+        return response()->json($status);
     }
 
     public function mails(Request $request)
@@ -78,7 +100,11 @@ class GmailController extends Controller
             $gmailFilters->prepend($gmailDefaultFilter);
         }
 
-        return view('gmail.mails', compact('gmails', 'gmailFilters', 'filter'));
+        $loadStatus = $filterId ? GmailLoadStatus::get((int) $filterId) : null;
+        $loadActive = GmailLoadStatus::isActive($loadStatus)
+            || $request->boolean('loading');
+
+        return view('gmail.mails', compact('gmails', 'gmailFilters', 'filter', 'filterId', 'loadStatus', 'loadActive'));
     }
 
     public function downloadAttachment($mailId, $attachmentId)
@@ -126,23 +152,40 @@ class GmailController extends Controller
             return redirect()->route('login');
         }
 
-        $result = GmailService::handleOAuthCallback($code);
-        $token = $result['token'];
-        $email = $result['email'] ?? ($token['email'] ?? null);
-
-        if (! $email) {
-            flash()->error('Could not determine Google account email');
+        try {
+            $result = GmailService::handleOAuthCallback($code);
+        } catch (\Throwable $e) {
+            \Log::error('Gmail OAuth callback failed', ['error' => $e->getMessage()]);
+            flash()->error('Gmail authentication failed: '.$e->getMessage());
 
             return redirect()->route('login');
         }
 
-        $tempUserId = 'tmp_'.uniqid();
+        $token = $result['token'];
+        $email = $result['email'] ?? ($token['email'] ?? null);
+
+        if (! $email) {
+            flash()->error('Could not determine Google account email. Ensure openid/email scopes are granted, then try again.');
+
+            return redirect()->route('login');
+        }
+
+        $tempUserId = 'tmp_'.uniqid('', true);
         GmailService::storeToken($tempUserId, $token);
 
-        $user = User::firstOrCreate(['email' => $email]);
+        $user = User::firstOrCreate(
+            ['email' => $email],
+            ['name' => $email, 'password' => null]
+        );
         GmailService::moveToken($tempUserId, $user->id);
 
+        // Ensure token is definitely stored under the real user id even if move failed
+        if (! app(\App\Services\Gmail\GmailTokenStore::class)->exists($user->id)) {
+            GmailService::storeToken($user->id, $token);
+        }
+
         auth()->login($user, true);
+        $request->session()->regenerate();
 
         flash()->success('Gmail profile has been successfully authenticated');
 

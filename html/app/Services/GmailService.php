@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
+
 class GmailService
 {
     const MAX_PAGES_TO_LOAD = 1000;
@@ -50,10 +51,13 @@ class GmailService
         static::api()->revoke($user->id);
     }
 
-    public static function saveData(GmailMessage $mail, GmailFilter $filter): void
+    /**
+     * @return bool True when a new gmail row was created and filled
+     */
+    public static function saveData(GmailMessage $mail, GmailFilter $filter): bool
     {
         if ($filter->regex && (! static::checkRegex($mail->getSubject(), $filter->regex) && ! static::checkRegex($mail->getHtmlBody(), $filter->regex))) {
-            return;
+            return false;
         }
 
         $gmail = $filter->gmails()->firstOrCreate([
@@ -62,28 +66,32 @@ class GmailService
             'user_id' => $filter->user_id,
         ]);
 
-        if ($gmail->wasRecentlyCreated) {
-            $htmlBody = $mail->getHtmlBody();
-
-            $gmail->fill([
-                'internal_date' => $mail->getInternalDate(),
-                'date' => $mail->getDate(),
-                'fwd_date' => self::parseFwdDate($htmlBody),
-                'labels' => $mail->getLabels(),
-                'subject' => $mail->getSubject(),
-                'from_name' => $mail->getFromName(),
-                'from_email' => $mail->getFromEmail(),
-                'to' => $mail->getTo(),
-                'delivered_to' => $mail->getDeliveredTo(),
-                'html_body' => $htmlBody,
-                'attachments' => $mail->hasAttachments() ? static::downloadAttachments($mail, $gmail) : null,
-            ]);
-            $gmail->save();
-
-            if (! $gmail->attachments) {
-                static::saveBodyToPdfFile($gmail);
-            }
+        if (! $gmail->wasRecentlyCreated) {
+            return false;
         }
+
+        $htmlBody = $mail->getHtmlBody();
+
+        $gmail->fill([
+            'internal_date' => $mail->getInternalDate(),
+            'date' => $mail->getDate(),
+            'fwd_date' => self::parseFwdDate($htmlBody),
+            'labels' => $mail->getLabels(),
+            'subject' => $mail->getSubject(),
+            'from_name' => $mail->getFromName(),
+            'from_email' => $mail->getFromEmail(),
+            'to' => $mail->getTo(),
+            'delivered_to' => $mail->getDeliveredTo(),
+            'html_body' => $htmlBody,
+            'attachments' => $mail->hasAttachments() ? static::downloadAttachments($mail, $gmail) : null,
+        ]);
+        $gmail->save();
+
+        if (! $gmail->attachments) {
+            static::saveBodyToPdfFile($gmail);
+        }
+
+        return true;
     }
 
     public static function downloadAttachments(GmailMessage $mail, Gmail $gmail): array
@@ -161,18 +169,40 @@ class GmailService
         return 'gmail/'.date('Y/m/d').'/u'.$gmail->user_id.'/f'.$gmail->gmail_filter_id.'/m_'.$gmail->mail_id;
     }
 
-    public static function getMailByFilter(GmailFilter $filter, $beforeDate = null, $afterDate = null): void
+    /**
+     * @return array{listed_count: int, saved_count: int, total_stored: int}
+     */
+    public static function getMailByFilter(GmailFilter $filter, $beforeDate = null, $afterDate = null, ?int $statusFilterId = null): array
     {
+        $listedCount = 0;
+        $savedCount = 0;
+        $statusId = $statusFilterId ?? $filter->id;
+
         try {
             $api = static::api();
             $query = $api->buildSearchQuery($filter->filter, $beforeDate, $afterDate);
             $pageToken = null;
             $page = 0;
 
+            GmailLoadStatus::markRunning($statusId, 'Searching Gmail: '.mb_strimwidth((string) $query, 0, 80, '…'));
+
             do {
                 $result = $api->listMessages($filter->user_id, $query, 100, $pageToken);
-                foreach (static::hydrateMessageCollection($result['messages'], $filter->user_id) as $mail) {
-                    static::saveData($mail, $filter);
+                $batch = $result['messages'] ?? [];
+                $listedCount += count($batch);
+
+                GmailLoadStatus::progress(
+                    $statusId,
+                    $listedCount,
+                    $savedCount,
+                    'Page '.($page + 1).': listed '.$listedCount.' message(s), saved '.$savedCount.' new — fetching bodies/attachments…'
+                );
+
+                foreach (static::hydrateMessageCollection($batch, $filter->user_id) as $mail) {
+                    if (static::saveData($mail, $filter)) {
+                        $savedCount++;
+                    }
+                    GmailLoadStatus::progress($statusId, $listedCount, $savedCount);
                 }
 
                 $pageToken = $result['nextPageToken'] ?? null;
@@ -180,7 +210,14 @@ class GmailService
             } while ($pageToken && $page < static::MAX_PAGES_TO_LOAD);
         } catch (\Exception $e) {
             Log::info(print_r([$e->getMessage(), $e->getTraceAsString()], true));
+            throw $e;
         }
+
+        return [
+            'listed_count' => $listedCount,
+            'saved_count' => $savedCount,
+            'total_stored' => $filter->gmails()->count(),
+        ];
     }
 
     private static function checkRegex($str, $regex): bool

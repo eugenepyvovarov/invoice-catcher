@@ -142,13 +142,15 @@ class GmailMessage
             return;
         }
 
-        $mimeType = $payload->getMimeType() ?? '';
-        $filename = $payload->getFilename() ?: $fallbackFilename;
+        $mimeType = strtolower($payload->getMimeType() ?? '');
+        $filename = trim((string) ($payload->getFilename() ?? ''));
         $body = $payload->getBody();
         $data = $body?->getData();
         $attachmentId = $body?->getAttachmentId();
+        $hasRealFilename = $filename !== '';
 
-        if ($filename && $filename !== 'attachment' && ($data || $attachmentId)) {
+        // Named parts (or attachmentId) are treated as attachments, not body text.
+        if ($hasRealFilename && ($data || $attachmentId)) {
             $decoded = $data ? $this->decodeBody($data) : '';
             $this->attachments[] = [
                 'id' => $attachmentId ?: (string) count($this->attachments),
@@ -158,10 +160,20 @@ class GmailMessage
                 'data' => $decoded,
                 'attachmentId' => $attachmentId,
             ];
-        } elseif ($data && str_contains($mimeType, 'text/html') && $this->htmlBody === null) {
-            $this->htmlBody = $this->decodeBody($data);
-        } elseif ($data && str_contains($mimeType, 'text/plain') && $this->textBody === null) {
-            $this->textBody = nl2br(e($this->decodeBody($data)));
+        } elseif ($data) {
+            if (str_contains($mimeType, 'text/html') && $this->htmlBody === null) {
+                $this->htmlBody = $this->decodeBody($data);
+            } elseif (str_contains($mimeType, 'text/plain') && $this->textBody === null) {
+                $this->textBody = nl2br(e($this->decodeBody($data)));
+            } elseif ($mimeType === '' && $this->htmlBody === null && $this->textBody === null) {
+                // Some messages ship body bytes without a useful mime on the leaf part.
+                $decoded = $this->decodeBody($data);
+                if (str_contains($decoded, '<html') || str_contains($decoded, '<div') || str_contains($decoded, '<br')) {
+                    $this->htmlBody = $decoded;
+                } else {
+                    $this->textBody = nl2br(e($decoded));
+                }
+            }
         }
 
         foreach ($payload->getParts() ?? [] as $index => $part) {

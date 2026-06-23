@@ -16,6 +16,11 @@ class GmailAuth
             return $next($request);
         }
 
-        return redirect()->route('gmail.login');
+        // Logged in via session but Gmail token missing/invalid — send to OAuth, not /login
+        if ($user) {
+            return redirect()->route('gmail.login');
+        }
+
+        return redirect()->route('login');
     }
 }
